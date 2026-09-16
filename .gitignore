@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+_site/
+board_data.json
+web/NFL Board.html
+data/nfl.db-journal
