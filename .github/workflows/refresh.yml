@@ -1,0 +1,130 @@
+# Refreshes the NFL Betting Board and publishes it to GitHub Pages.
+#
+# Schedule (Chicago time):
+#   Monday-Friday  3:30 PM
+#   Sunday         8:00 AM, 11:00 AM, 2:30 PM, 6:00 PM
+#
+# GitHub schedules run on UTC and ignore daylight saving time, so every
+# refresh is listed twice: once for Central Daylight Time (UTC-5, March to
+# early November) and once for Central Standard Time (UTC-6). The "Check the
+# clock" step lets only the copy that matches Chicago's current clock run.
+#
+# Manual refresh: Actions tab -> "Refresh NFL Board" -> "Run workflow".
+
+name: Refresh NFL Board
+
+on:
+  schedule:
+    # Central Daylight Time (UTC-5)
+    - cron: "30 20 * * 1-5"   # Mon-Fri 3:30 PM
+    - cron: "0 13 * * 0"      # Sun 8:00 AM
+    - cron: "0 16 * * 0"      # Sun 11:00 AM
+    - cron: "30 19 * * 0"     # Sun 2:30 PM
+    - cron: "0 23 * * 0"      # Sun 6:00 PM
+    # Central Standard Time (UTC-6)
+    - cron: "30 21 * * 1-5"   # Mon-Fri 3:30 PM
+    - cron: "0 14 * * 0"      # Sun 8:00 AM
+    - cron: "0 17 * * 0"      # Sun 11:00 AM
+    - cron: "30 20 * * 0"     # Sun 2:30 PM
+    - cron: "0 0 * * 1"       # Sun 6:00 PM (midnight Monday in UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: write     # save the "last refreshed" note (keeps the schedule active)
+  pages: write        # publish the website
+  id-token: write     # required by the Pages deploy action
+
+concurrency:
+  group: refresh-board
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check the clock
+        id: gate
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ -z "$SCHEDULE" ]; then
+            echo "Manual run."; echo "go=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          case "$SCHEDULE" in
+            "30 20 * * 1-5"|"0 13 * * 0"|"0 16 * * 0"|"30 19 * * 0"|"0 23 * * 0") want="-0500" ;;
+            *) want="-0600" ;;
+          esac
+          now=$(TZ=America/Chicago date +%z)
+          echo "Schedule '$SCHEDULE' is for UTC$want; Chicago is UTC$now now."
+          if [ "$now" = "$want" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; else echo "go=false" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.go == 'true'
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install packages
+        if: steps.gate.outputs.go == 'true'
+        run: pip install -r requirements.txt
+
+      # The database is kept between runs in GitHub's cache so finished
+      # seasons aren't downloaded again. If the cache is empty, the copy
+      # saved in the repository is used as the starting point.
+      - name: Restore database
+        if: steps.gate.outputs.go == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: data/nfl.db
+          key: nfl-db-${{ github.run_id }}
+          restore-keys: nfl-db-
+
+      - name: Download latest data
+        if: steps.gate.outputs.go == 'true'
+        run: python backfill.py
+
+      - name: Run checks
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          python verify.py | tee verify.log
+          if grep -q "\[FAIL\]" verify.log; then
+            echo "::error::A data check failed, so the website was not updated."
+            exit 1
+          fi
+
+      - name: Build website
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          python export_board.py
+          python build_site.py
+
+      - name: Save database
+        if: steps.gate.outputs.go == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/nfl.db
+          key: nfl-db-${{ github.run_id }}
+
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.gate.outputs.go == 'true'
+        with:
+          path: _site
+
+      - uses: actions/deploy-pages@v4
+        if: steps.gate.outputs.go == 'true'
+
+      # GitHub pauses scheduled workflows in public repositories after 60
+      # days without a commit. This one-line note is the commit.
+      - name: Record refresh time
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          date -u +"%Y-%m-%dT%H:%MZ" > data/last_refresh.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/last_refresh.txt
+          git commit -m "Refresh $(cat data/last_refresh.txt)" || exit 0
+          git pull --rebase -q && git push -q
