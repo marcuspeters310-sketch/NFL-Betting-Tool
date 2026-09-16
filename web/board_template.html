@@ -198,6 +198,138 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
   .teams-line{font-size:20px}
 }
 @media (prefers-reduced-motion:no-preference){ details.game .body{animation:fade .18s ease-out} @keyframes fade{from{opacity:.4}to{opacity:1}} }
+/* ---- game tiles (This week) ---- */
+.tiles-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+@media (min-width:820px){.tiles-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1180px){.wrap{max-width:1180px}.tiles-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.gtile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0;scroll-margin-top:70px}
+.ghead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:inherit;text-decoration:none}
+.gteams{font:700 26px/1 var(--display);text-transform:uppercase}
+.gteams .at,.ghero h2 .at{color:var(--muted);font-size:.75em;margin:0 5px}
+.gmeta{display:flex;gap:8px;align-items:baseline;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.more-link{font-size:12px;letter-spacing:0;text-transform:none;font-weight:600;color:var(--good)}
+.ghead:hover .more-link{text-decoration:underline}
+.sw{display:flex;background:var(--sunk);border-radius:9px;padding:3px;gap:2px}
+.sw button{flex:1 1 0;border:0;border-radius:7px;padding:8px 0;font-weight:600;font-size:13px;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap}
+.sw button .num{font-weight:500}
+.sw button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .12)}
+.soft{color:var(--muted)} .strong{font-weight:600}
+.wx{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:12.5px}
+.wx.flag{background:color-mix(in srgb,var(--chalk) 16%,var(--surface));border-color:color-mix(in srgb,var(--chalk) 60%,var(--line))}
+.wx-i{display:inline-flex;align-items:center;gap:4px}
+.wx-i svg{width:15px;height:15px;fill:none;stroke:var(--muted);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.wx-i.warn{font-weight:600}
+.wx-i.muted{color:var(--muted)}
+.wx-note{width:100%;font-size:11px;color:var(--muted)}
+.wx.compact{background:transparent;border:0;padding:0;color:#E4EBE7}
+.wx.compact .wx-note{color:#91A098}
+.wx.compact .wx-i svg{stroke:#91A098}
+.wx.compact .wx-i.warn{color:#E6BC17}
+.final{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;padding:6px 10px;border-radius:8px;background:var(--ink);color:var(--bg);font-size:12.5px}
+.mt{display:flex;flex-direction:column}
+.mt h5,.changes h5{font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
+.mhead{display:grid;grid-template-columns:minmax(0,1fr) 116px minmax(0,1fr);font-size:11px;color:var(--muted);padding-top:2px}
+.mhead b{font:700 16px/1 var(--display);color:var(--ink)}
+.mhead span:last-child{text-align:right}
+.mrow{display:grid;grid-template-columns:minmax(0,1fr) 116px minmax(0,1fr);align-items:center;padding:5px 0;border-top:1px solid var(--sunk);font-size:13px}
+.mrow .c{display:inline-flex;align-items:center;gap:4px;min-width:0}
+.mrow .c.r{justify-content:flex-end;text-align:right}
+.mrow .c .rk{min-width:0;font-size:10.5px;padding:1px 4px}
+.mid{display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.15;font-size:11.5px}
+.mid small{font-size:10px;color:var(--muted)}
+.hurt{color:var(--bad);font-weight:600}
+.zero{color:var(--muted)}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.est{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:8px}
+.est span{display:flex;flex-direction:column;line-height:1.2}
+.est span.r{align-items:flex-end}
+.est small{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.est b{font-size:13px}
+.est b.num{font-size:16px}
+/* ---- game page ---- */
+.gpage{margin:0 -16px}
+.ghero{background:#15201A;color:#F2F5F3;padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.ghero-top{display:flex;justify-content:space-between;font-size:13px;color:#91A098}
+.ghero-top .back{color:#E6BC17;font-weight:600;text-decoration:none}
+.ghero-main{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.ghero h2{font:700 38px/.95 var(--display);text-transform:uppercase;margin:0}
+.ghero h2 .at{color:#91A098}
+.ghero p{margin:4px 0 0;font-size:12px;color:#91A098}
+.chips2{display:flex;gap:6px}
+.chipbox{display:flex;flex-direction:column;align-items:center;background:#1C2621;border-radius:8px;padding:5px 9px}
+.chipbox small{font-size:9.5px;letter-spacing:.06em;color:#91A098}
+.chipbox b{font-size:14px;white-space:nowrap}
+.chipbox.hot{background:#E6BC17;color:#1D1800}
+.chipbox.hot small{color:#1D1800}
+.ghero .final{background:#1C2621;color:#F2F5F3}
+.gtabs{position:sticky;top:0;z-index:4;display:flex;background:var(--surface);border-bottom:1px solid var(--line);padding:0 8px}
+.gtabs a{flex:1 1 0;text-align:center;padding:11px 0 9px;font-weight:600;font-size:14px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent}
+.gtabs a[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--chalk)}
+.gbody{padding:12px 16px 8px;display:flex;flex-direction:column;gap:10px;max-width:760px;margin:0 auto}
+.gbody .sw button .soft{font-weight:400}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.card.flush{padding:0;overflow:hidden}
+.card h4{font:700 17px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;margin:4px 0 6px}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.pad{padding-left:12px;padding-right:12px}
+.card-h.pad{padding-top:8px}
+.meta.pad{padding-bottom:10px}
+.meta.tight{margin:0 0 6px}
+.lg{display:grid;grid-template-columns:24px 56px minmax(0,1fr) 40px 34px 36px 34px;column-gap:4px;white-space:nowrap;align-items:center;font-size:12px;padding:5px 0;border-bottom:1px solid var(--sunk)}
+.lg-h{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom-color:var(--line)}
+.lg .opp{font-family:var(--body);font-weight:500}
+.lg .r{text-align:right} .lg .ctr{text-align:center}
+.stack{display:flex;flex-direction:column;align-items:center;line-height:1.1}
+.stack small{font-size:10px}
+.res{font-size:10.5px;padding:1px 5px;border-radius:4px;background:var(--sunk);color:var(--muted)}
+.res.cov{background:color-mix(in srgb,var(--cover) 20%,var(--surface));color:var(--cover)}
+.res.miss{background:color-mix(in srgb,var(--miss) 20%,var(--surface));color:var(--miss)}
+.res.over{background:var(--ink);color:var(--bg)}
+.res.under{background:var(--sunk);color:var(--ink)}
+.changes{background:color-mix(in srgb,var(--chalk) 9%,var(--surface));border-color:color-mix(in srgb,var(--chalk) 45%,var(--line))}
+.changes p{margin:0 0 6px;font-size:13px}
+.kv{display:grid;grid-template-columns:58px minmax(0,1fr);row-gap:3px;font-size:13px}
+.chg{color:var(--bad)}
+.chrow{display:grid;grid-template-columns:42px minmax(0,1fr) auto;column-gap:6px;align-items:baseline;font-size:12.5px;padding:2px 0}
+.chrow .num{font-size:11px}
+.chrow .nm{font-weight:500}
+.chrow .r{text-align:right;font-size:11.5px}
+.chrow .gone{color:var(--bad)}
+.dwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-top:1px solid var(--line)}
+.dtable{display:flex;flex-direction:column;width:max-content;min-width:100%}
+.dr{display:flex;align-items:center;border-bottom:1px solid var(--sunk);background:var(--surface)}
+.dr.alt{background:color-mix(in srgb,var(--sunk) 45%,var(--surface))}
+.dr.dhead{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom-color:var(--line)}
+.dp{position:sticky;left:0;z-index:1;background:inherit;width:44px;min-width:44px;padding:8px 0 8px 12px;font-size:11.5px;color:var(--muted)}
+.dc{width:150px;min-width:150px;padding:8px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc.st{position:sticky;left:44px;z-index:1;background:inherit;width:172px;min-width:172px;font-weight:600;box-shadow:1px 0 0 var(--line)}
+.dhead .dc.st{font-weight:500}
+.dbtn{border:0;padding:0;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.dbtn.on{text-decoration:underline;text-underline-offset:3px}
+.tag{font-size:11px;font-weight:700;margin-left:2px}
+.tag.out{color:var(--bad)} .tag.doubtful,.tag.questionable,.tag.limited{color:#B07A00}
+:root[data-theme="dark"] .tag.doubtful,:root[data-theme="dark"] .tag.questionable,:root[data-theme="dark"] .tag.limited{color:var(--chalk)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tag.doubtful,:root:not([data-theme="light"]) .tag.questionable,:root:not([data-theme="light"]) .tag.limited{color:var(--chalk)}}
+.dsel{margin:10px 12px 0;padding:10px 12px;border-radius:8px;background:var(--bad-bg);display:flex;flex-direction:column;gap:2px;font-size:12.5px}
+.dsel.questionable,.dsel.doubtful,.dsel.limited{background:color-mix(in srgb,var(--chalk) 18%,var(--surface))}
+.dsel-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:14px}
+.dsel-h small{font-weight:400;color:var(--muted)}
+.tagword{font-size:12px;font-weight:700}
+.linkish{align-self:flex-start;border:0;background:transparent;padding:2px 0 0;color:var(--muted);font-weight:500;font-size:12px;cursor:pointer}
+.stack2{display:flex!important;flex-direction:column;align-items:flex-start!important;line-height:1.2;gap:0!important}
+.c.r.stack2{align-items:flex-end!important}
+.stack2 .big{font-size:13.5px;font-weight:500}
+.stack2 small{font-size:10.5px}
+.stack2 .sig{margin:1px 0 0}
+.bars2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.bars{display:flex;flex-direction:column;gap:3px}
+.bars b{font:700 15px/1 var(--display)}
+.bar-row{display:grid;grid-template-columns:32px minmax(0,1fr) 38px;column-gap:4px;align-items:center;font-size:10.5px}
+.bar-row .r{text-align:right}
+.bar-track{position:relative;height:10px;background:linear-gradient(to right,transparent calc(50% - .5px),var(--line) calc(50% - .5px),var(--line) calc(50% + .5px),transparent calc(50% + .5px))}
+.bar-track i{position:absolute;top:1px;height:8px}
+.bar-track i.up{left:50%;background:var(--cover);border-radius:0 2px 2px 0}
+.bar-track i.down{right:50%;background:var(--miss);border-radius:2px 0 0 2px}
 </style>
 
 <header class="top"><div class="wrap">
@@ -230,6 +362,9 @@ const state = {
   open: new Set(),
   tabs: {},
   modelOpen: false,
+  tileView: {},
+  gameTeam: null,
+  depthSel: null,
 };
 if (!D.weeks.some(w => w.week === state.week)) state.week = D.current_week;
 if (!D.teams[state.team]) state.team = Object.keys(D.teams)[0];
@@ -553,44 +688,149 @@ function gameBody(g){
 const currentWeek = () => D.weeks.find(w => w.week === state.week) || D.weeks[0];
 const findGame = id => currentWeek().games.find(g => g.id === id);
 
+/* ======================================================================
+   This week: one tile per game, with a Spread / Over-Under switch.
+   Tap a tile's header to open the full game page (#game=<id>).
+   ====================================================================== */
+const TEAM_FULL = id => NAMES[id] || id;
+const ENTRIES = ["2026 season", "Last 3 games", "Last 5 games", "Last 10 games"];
+const WIN_LABEL = {"Last 3 games": "Last 3", "Last 5 games": "Last 5", "Last 10 games": "Last 10"};
+const sgn = (v, d = 1) => v == null ? "–" : `${v > 0 ? "+" : v < 0 ? minus : ""}${Math.abs(v).toFixed(d)}`;
+const sgnCls = v => v == null || v === 0 ? "" : v > 0 ? "pos" : "neg";
+const rkN = r => r == null ? `<span class="rk">–</span>` : `<span class="rk">#${r}</span>`;   // neutral rank (pace)
+const mv = (t, k) => currentWeek().metrics?.[t]?.v?.[k] || [null, null];
+const fnum = s => s == null ? null : parseFloat(String(s).replace(minus, "-"));
+
+function hurtCount(t){
+  const dep = currentWeek().avail?.[t]?.depth || [];
+  const hurt = dep.filter(p => p.st && ["out", "doubtful", "questionable"].includes(p.x));
+  return {o: hurt.filter(p => p.s === "O").length, d: hurt.filter(p => p.s === "D").length};
+}
+function windowRows(g, kind){
+  const pick = side => {
+    const A = new Map((g.trends?.[side]?.angles || []).map(a => [a.angle, a]));
+    return ENTRIES.map(k => {
+      const key = k === "2026 season" ? `${D.season} season` : k;
+      const a = A.get(key);
+      if (!a) return null;
+      return kind === "ats"
+        ? {rec: a.n || a.games ? a.record : "–", m: a.avg_margin, n: a.games}
+        : {rec: a.ou_n || a.games ? a.ou_record : "–", m: a.avg_total_vs_line, n: a.games};
+    });
+  };
+  const A = pick("away"), H = pick("home");
+  return ENTRIES.map((k, i) => ({label: WIN_LABEL[k] || String(D.season), a: A[i], h: H[i]}));
+}
+const cellL = ([v, r], rank = rk) => `<span class="c l">${rank(r)}<span class="num">${esc(v ?? "–")}</span></span>`;
+const cellR = ([v, r], rank = rk) => `<span class="c r"><span class="num">${esc(v ?? "–")}</span>${rank(r)}</span>`;
+const mid = (top, bot) => `<span class="mid"><span>${top}</span>${bot ? `<small>${bot}</small>` : ""}</span>`;
+const mrow = (l, m, r) => `<div class="mrow">${l}${m}${r}</div>`;
+const hurtSpan = (n, word, right) => `<span class="c ${right ? "r" : "l"} num ${n ? "hurt" : "zero"}">${n} ${word}</span>`;
+
+function weatherStrip(g, compact){
+  const w = g.wx || {};
+  const F = D.weather_flags || {wind: 15, rain: 50};
+  const bits = [];
+  if (g.neutral && !w.roof) bits.push(`<span class="wx-i">Neutral site · no forecast</span>`);
+  else if (w.roof === "dome") bits.push(`<span class="wx-i">${ICON.roof}Indoors</span>`);
+  else {
+    if (w.roof === "retractable") bits.push(`<span class="wx-i">${ICON.roof}Retractable roof</span>`);
+    if (w.temp == null && w.wind == null) bits.push(`<span class="wx-i muted">${g.final ? "No weather recorded" : "Forecast not available yet"}</span>`);
+    else {
+      if (w.temp != null) bits.push(`<span class="wx-i">${ICON.temp}${Math.round(w.temp)}°F</span>`);
+      if (w.wind != null) bits.push(`<span class="wx-i ${w.wind >= F.wind ? "warn" : ""}">${ICON.wind}${Math.round(w.wind)} mph${w.gust != null && w.gust >= w.wind + 8 ? ` <small>(gusts ${Math.round(w.gust)})</small>` : ""}</span>`);
+      if (w.precip != null) bits.push(`<span class="wx-i ${w.precip >= F.rain ? "warn" : ""}">${ICON.rain}${Math.round(w.precip)}% rain</span>`);
+    }
+  }
+  const note = w.flag ? `Weather flag: ${esc(w.flag)}` : w.src === "forecast" ? "Kickoff forecast" : w.src === "recorded" ? "Recorded at kickoff" : "";
+  return `<div class="wx ${w.flag ? "flag" : ""} ${compact ? "compact" : ""}">${bits.join("")}${note ? `<span class="wx-note">${note}${g.stadium && !compact ? " · " + esc(g.stadium) : ""}</span>` : ""}</div>`;
+}
+const ICON = {
+  temp: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/></svg>`,
+  wind: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h8.5a2 2 0 1 0-2-2M2 10h11a2 2 0 1 1-2 2"/></svg>`,
+  rain: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 9.5a3 3 0 0 1 .4-6 4 4 0 0 1 7.3 1.3 2.4 2.4 0 0 1-.2 4.7z"/><path d="M5.5 11.5l-.8 2M8.5 11.5l-.8 2M11.5 11.5l-.8 2"/></svg>`,
+  roof: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 13.5V8a6.5 5 0 0 1 13 0v5.5z"/><path d="M1.5 13.5h13"/></svg>`,
+};
+
+function recRows(g, kind){
+  return windowRows(g, kind).map(r => mrow(
+    `<span class="c l num">${esc(r.a?.rec ?? "–")} <span class="${sgnCls(r.a?.m)}">${sgn(r.a?.m)}</span></span>`,
+    mid(r.label, r.label === String(D.season) && r.a ? `${r.a.n} / ${r.h?.n ?? 0} games` : ""),
+    `<span class="c r num"><span class="${sgnCls(r.h?.m)}">${sgn(r.h?.m)}</span> ${esc(r.h?.rec ?? "–")}</span>`)).join("");
+}
+
+function tileBody(g, view){
+  const a = g.away, h = g.home, ha = hurtCount(a), hh = hurtCount(h);
+  const hurtRows = `<h5>Hurt starters</h5>
+    ${mrow(hurtSpan(ha.o, "off"), mid("Offense", "vs defense"), hurtSpan(hh.d, "def", true))}
+    ${mrow(hurtSpan(ha.d, "def"), mid("Defense", "vs offense"), hurtSpan(hh.o, "off", true))}`;
+  const ptsRows = `${mrow(cellL(mv(a, "off_ppg")), mid("Points scored", "vs points allowed"), cellR(mv(h, "def_ppg")))}
+    ${mrow(cellL(mv(a, "def_ppg")), mid("Points allowed", "vs points scored"), cellR(mv(h, "off_ppg")))}`;
+  const head = `<div class="mhead"><span><b>${a}</b> away</span><span></span><span>home <b>${h}</b></span></div>`;
+  if (view === "ou"){
+    const v = [fnum(mv(a, "off_ppg")[0]), fnum(mv(h, "def_ppg")[0]), fnum(mv(h, "off_ppg")[0]), fnum(mv(a, "def_ppg")[0])];
+    const est = v.every(x => x != null) ? (v[0] + v[1]) / 2 + (v[2] + v[3]) / 2 : null;
+    const diff = est != null && g.total != null ? est - g.total : null;
+    return `${head}<h5>Scoring matchups</h5>${ptsRows}
+      ${est == null ? "" : `<div class="est"><span><b>Points estimate</b><small>avg of the rows above · not a model</small></span>
+        <span class="r"><b class="num">${est.toFixed(1)}</b>${diff == null ? "" : `<small class="num ${sgnCls(diff)}">${Math.abs(diff).toFixed(1)} ${diff >= 0 ? "over" : "under"} total</small>`}</span></div>`}
+      <h5>Pace</h5>
+      ${mrow(cellL(mv(a, "pace_plays"), rkN), mid("Plays / game", "rank 1 = most"), cellR(mv(h, "pace_plays"), rkN))}
+      ${mrow(cellL(mv(a, "pace_sec"), rkN), mid("Sec / snap", "rank 1 = fastest"), cellR(mv(h, "pace_sec"), rkN))}
+      ${hurtRows}
+      <h5>O/U record (overs-unders) · avg vs line</h5>${recRows(g, "ou")}`;
+  }
+  return `${head}<h5>Matchups</h5>
+    ${mrow(cellL(mv(a, "off_epa")), mid("Off EPA / play", "vs def EPA allowed"), cellR(mv(h, "def_epa")))}
+    ${mrow(cellL(mv(a, "def_epa")), mid("Def EPA allowed", "vs off EPA / play"), cellR(mv(h, "off_epa")))}
+    ${ptsRows}${hurtRows}
+    <h5>ATS record (W-L) · avg margin vs spread</h5>${recRows(g, "ats")}`;
+}
+
+function finalStrip(g){
+  if (!g.final) return "";
+  const f = g.final;
+  const cov = f.home_ats === "W" ? `${g.home} covered` : f.home_ats === "L" ? `${g.away} covered` : f.home_ats === "P" ? "ATS push" : "";
+  const ou = f.ou === "OVER" ? "Over" : f.ou === "UNDER" ? "Under" : f.ou ? "Total push" : "";
+  return `<div class="final"><span class="num"><b>Final</b> ${g.away} ${f.away} – ${f.home} ${g.home}</span><span>${[cov, ou].filter(Boolean).join(" · ")}</span></div>`;
+}
+
+function gameTile(g){
+  const view = state.tileView[g.id] || "spread";
+  const when = `${(g.weekday || "").slice(0, 3)} ${fmtKick(g.time)} ET`;
+  return `<article class="gtile" id="g-${g.id}">
+    <a class="ghead" href="#game=${g.id}">
+      <span class="gteams">${g.away}<span class="at">@</span>${g.home}</span>
+      <span class="gmeta"><span>${esc(when)}</span><span class="more-link">Details ›</span></span>
+    </a>
+    <div class="sw" role="group" aria-label="Summary for ${g.away} at ${g.home}">
+      <button type="button" data-tile="${g.id}" data-v="spread" aria-pressed="${view === "spread"}">Spread <span class="num">${esc(spreadText(g))}</span></button>
+      <button type="button" data-tile="${g.id}" data-v="ou" aria-pressed="${view === "ou"}">Over/Under <span class="num">${g.total ?? "–"}</span></button>
+    </div>
+    ${finalStrip(g)}
+    ${weatherStrip(g, false)}
+    <div class="mt">${tileBody(g, view)}</div>
+  </article>`;
+}
+
 function renderWeek(){
-  const W = D.weeks.find(w => w.week === state.week) || D.weeks[0];
+  const W = currentWeek();
+  const route = parseRoute();
+  if (route.game){
+    const wk = D.weeks.find(w => w.games.some(x => x.id === route.game));
+    if (wk){
+      state.week = wk.week;
+      renderGame(wk.games.find(x => x.id === route.game), route.tab);
+      return;
+    }
+  }
   const played = W.games.filter(g => g.final).length;
-  const upcoming = played < W.games.length;
-
-  // Summary: the most lopsided offense-vs-defense pairings by average rank gap.
-  const pairs = [];
-  for (const g of W.games){
-    for (const [off, def] of [[g.away, g.home], [g.home, g.away]]){
-      const rows = matchup(W.metrics, off, def).filter(r => r.gap != null);
-      if (!rows.length) continue;
-      const avg = rows.reduce((s, r) => s + r.gap, 0) / rows.length;
-      pairs.push({g, off, def, avg, edges: rows.filter(r => r.edge === "o").length});
-    }
-  }
-  pairs.sort((a, b) => b.avg - a.avg);
-  const top = pairs.slice(0, 4);
-
-  const modelRows = W.games.filter(g => g.model && g.model.spread_edge != null)
-    .sort((a, b) => Math.abs(b.model.spread_edge) - Math.abs(a.model.spread_edge));
-  const bt = D.backtest;
-  const keyInj = [];
-  for (const g of W.games){
-    for (const t of [g.away, g.home]){
-      for (const p of (W.avail?.[t]?.depth || [])){
-        if (p.st && ["out", "doubtful", "questionable"].includes(p.x)) keyInj.push({g, t, p});
-      }
-    }
-  }
-  keyInj.sort((a, b) => (b.p.sh ?? 0) - (a.p.sh ?? 0));
-  const anyStale = Object.values(W.avail || {}).some(a => !a.current);
-
   const byDay = [];
   for (const g of W.games){
     const last = byDay[byDay.length - 1];
     if (last && last.date === g.date) last.games.push(g); else byDay.push({date: g.date, weekday: g.weekday, games: [g]});
   }
-
+  const anyStale = Object.values(W.avail || {}).some(a => !a.current);
   app.innerHTML = `
     <div class="weekbar">
       <h2>Week ${W.week}</h2>
@@ -600,36 +840,200 @@ function renderWeek(){
       <span class="sub">${W.games.length} games · ${played} played</span>
     </div>
     <details class="guide" id="guide"><summary>How to read this board</summary><div>
-      <p><b>Spreads and totals</b> come from nflverse, which publishes lines alongside the schedule. Completed games show closing lines.</p>
-      <p><b>Ranks</b>: #1 is the best in the league on both sides of the ball. The best defense allows the least. Green means top 10 and red means bottom 10.</p>
-      <p><b>Edge</b> marks a stat where the two ranks are ${EDGE_GAP}+ places apart, roughly a top-third unit against a bottom-third one. Treat it as a reason to look closer, not as a bet.</p>
-      <p><b>The numbers</b> blend 2025 and 2026. This season counts for its games played ÷ 6, so one game = 17%, three = 50%, six or more = 100%. Each game only uses results from before its kickoff.</p>
-      <p><b>Injury tags</b>: OUT (or IR, PUP, NFI for reserve lists), D doubtful, Q questionable, LP limited or no practice without a game status. Snap share shows how big the player's role is.</p>
-      <p><b>Model line</b>: a simple power rating built from points and EPA. The table at the top shows how it did in last season's backtest, which wasn't well enough to bet on its own.</p>
-      <p><b>ATS records</b> always show n (games) and ± (95% margin of error). <span class="sig">signal</span> appears only when the record is far enough from 50% for that sample to support it. Most weeks, nothing clears that bar.</p>
+      <p><b>Each tile</b> has two summaries: <b>Spread</b> and <b>Over/Under</b>. The away team is always on the left and the home team on the right. Each middle row lines up one team's offense against the other team's defense.</p>
+      <p><b>Ranks</b>: #1 is the best in the league on both sides of the ball. Green means top 10 and red means bottom 10. Pace ranks aren't colored because fast or slow isn't good or bad.</p>
+      <p><b>The numbers</b> blend ${D.season - 1} and ${D.season}: this season counts for its games played ÷ 6. Each game only uses results from before its kickoff.</p>
+      <p><b>Records</b>: ATS is wins-losses against the spread; O/U is overs-unders. The number after a record is the average margin: points the team beat (+) or missed (−) the spread by, or points its games went over (+) or under (−) the total. "Last 10" includes playoffs and last season.</p>
+      <p><b>Points estimate</b> is the simple average of the two scoring rows, compared with the total. It isn't a model.</p>
+      <p><b>Weather</b> is the kickoff-hour forecast from Open-Meteo, refreshed with the board. A game is flagged at ${D.weather_flags?.wind ?? 15}+ mph wind or a ${D.weather_flags?.rain ?? 50}%+ chance of rain.</p>
+      <p><b>Details ›</b> opens the game page: game logs, roster and depth chart with injuries, and full ATS and O/U splits.</p>
+      ${anyStale ? `<p>This week's injury reports aren't all out yet (teams file Wednesday to Friday), so some hurt-starter counts use last week's report.</p>` : ""}
     </div></details>
-    ${top.length ? `<section class="mismatch"><h3>${upcoming ? "Most lopsided matchups" : "Most lopsided matchups going in"}</h3>
-      <div class="mm-list">${top.map(p => `<button type="button" class="mm" data-jump="${p.g.id}">
-        <b>${p.off} offense vs ${p.def} defense</b>
-        <span class="gap">Offense ranks <span class="num">${p.avg.toFixed(1)}</span> places higher, on average</span>
-        <small>${p.g.away} @ ${p.g.home} · ${spreadText(p.g)} · ${p.edges} edge${p.edges === 1 ? "" : "s"}</small>
-      </button>`).join("")}</div></section>` : ""}
-    ${keyInj.length && upcoming ? `<section class="mismatch"><h3>Hurt starters, biggest roles first</h3>
-      ${anyStale ? `<p class="notice" style="margin:0 0 8px">This week's injury reports aren't all out yet (teams file Wednesday to Friday). Some statuses below come from last week's report.</p>` : ""}
-      <div class="mm-list">${keyInj.slice(0, 8).map(({g, t, p}) => `<button type="button" class="mm" data-jump="${g.id}" data-open-tab="injuries">
-        <b>${esc(p.n)}${pill(p.x, p.rs)}</b>
-        <small>${t} ${p.p} · ${p.sh == null ? "snap share n/a" : Math.round(p.sh * 100) + "% of snaps"}${p.rp ? " · next up " + esc(p.rp) : ""}</small>
-        <small>${g.away} @ ${g.home}${p.inj ? " · " + esc(p.inj) : ""}</small>
-      </button>`).join("")}</div></section>` : ""}
-    ${modelRows.length ? `<details class="guide" id="model-table" ${state.modelOpen ? "open" : ""}><summary>Model lines vs the market: ${modelRows.filter(g => Math.abs(g.model.spread_edge) >= 3).length} games with a 3+ point gap</summary><div style="max-width:none">
-      <div class="tbl-wrap"><table><thead><tr><th>Game</th><th class="r">Model</th><th class="r">Market</th><th class="r">Gap</th><th>Side</th><th class="r">Model total</th><th class="r">Market</th><th class="r">Gap</th><th>Lean</th></tr></thead>
-      <tbody>${modelRows.map(g => `<tr class="${Math.abs(g.model.spread_edge) >= 3 ? "has-edge" : ""}"><td>${g.away} @ ${g.home}</td><td class="r num">${modelSpread(g, g.model.model_margin)}</td><td class="r num">${spreadText(g)}</td><td class="r num">${Math.abs(g.model.spread_edge).toFixed(1)}</td><td>${g.model.side ?? "–"}</td><td class="r num">${g.model.model_total?.toFixed(1)}</td><td class="r num">${g.total ?? "–"}</td><td class="r">${pm(g.model.total_edge)}</td><td>${g.model.lean ?? "–"}</td></tr>`).join("")}</tbody></table></div>
-      ${bt && bt.spreads ? `<p><b>How much to trust it.</b> The model fit its settings on ${bt.fit.fit_season}, then priced every ${bt.season} game using only what was known before kickoff. Its side went <b>${bt.spreads[0].record}</b> (${bt.spreads[0].pct}%) against closing lines, and ${bt.spreads[2].record} (${bt.spreads[2].pct}%, ±${bt.spreads[2].moe}) when the gap was 3+. Totals went ${bt.totals[0].record} overall and ${bt.totals[2].record} at 3+. On average it missed the final margin by ${bt.mae.model_margin} points, while the closing line missed by ${bt.mae.market_margin}. In short, it doesn't beat the market on its own. Use it to find games worth digging into.</p>` : ""}
-      <p>How it works: rating = half (points scored − allowed per game) + half (net EPA per play × ${bt?.fit?.epa_to_points ?? "–"}). Model margin = ${bt?.fit?.shrink ?? "–"} × rating gap + ${bt?.fit?.home_field ?? "–"} points home field.</p>
-    </div></details>` : ""}
-    ${byDay.map(d => `<section class="day"><h3>${fmtDate(d.date, d.weekday)}</h3><div class="games">${d.games.map(g => gameCard(g, W.metrics)).join("")}</div></section>`).join("")}
-    <p class="foot">Kickoff times are Eastern. Data: nflverse (schedules, lines, play-by-play). Results through ${esc(D.results_through)}. This page is a snapshot, not live, so check current prices at your sportsbook before betting.</p>
+    ${byDay.map(d => `<section class="day"><h3>${fmtDate(d.date, d.weekday)}</h3><div class="tiles-grid">${d.games.map(gameTile).join("")}</div></section>`).join("")}
+    <p class="foot">Kickoff times are Eastern. Data: nflverse (schedules, lines, play-by-play, depth charts, injuries) and Open-Meteo (weather). Results through ${esc(D.results_through)}. Lines update with each refresh, so check current prices at your sportsbook before betting.</p>
   `;
+}
+
+/* ---------------------------- Game page ----------------------------- */
+function parseRoute(){
+  const p = new URLSearchParams(location.hash.slice(1));
+  return {game: p.get("game"), tab: p.get("tab") || "logs"};
+}
+const GTABS = [["logs", "Game logs"], ["roster", "Roster"], ["ats", "ATS"], ["ou", "O/U"]];
+
+function teamSwitch(g, team){
+  return `<div class="sw" role="group" aria-label="Team">
+    ${[g.away, g.home].map((t, i) => `<button type="button" data-gteam="${t}" aria-pressed="${t === team}">${t} <span class="soft">${i ? "home" : "away"}</span></button>`).join("")}
+  </div>`;
+}
+function lineTxt(v){ return v == null ? "–" : v === 0 ? "PK" : v > 0 ? `${minus}${v}` : `+${-v}`; }
+const GT = {WC: "WC", DIV: "DIV", CON: "CONF", SB: "SB"};
+
+function logsPane(t){
+  const log = D.teamx?.[t]?.log || [];
+  const seasons = [D.season, D.season - 1];
+  return seasons.map(s => {
+    const rows = log.filter(r => r.s === s);
+    const w = rows.filter(r => r.ats === "W").length, l = rows.filter(r => r.ats === "L").length, p = rows.filter(r => r.ats === "P").length;
+    const o = rows.filter(r => r.ou === "OVER").length, u = rows.filter(r => r.ou === "UNDER").length;
+    return `<div class="card">
+      <div class="card-h"><h4>${s}</h4><span class="num soft">${rows.length ? `ATS ${w}-${l}${p ? "-" + p : ""} · O/U ${o}-${u}` : ""}</span></div>
+      ${rows.length ? `<div class="lg lg-h"><span>Wk</span><span>Opp</span><span>Result</span><span class="r">Line</span><span class="ctr">ATS</span><span class="r">Total</span><span class="ctr">O/U</span></div>
+      ${rows.map(r => {
+        const res = r.pf > r.pa ? "W" : r.pf < r.pa ? "L" : "T";
+        const od = r.tot != null && r.tl != null ? r.tot - r.tl : null;
+        return `<div class="lg num">
+          <span class="soft">${GT[r.gt] || r.wk}</span><span class="opp">${r.home ? "vs" : "@"} ${r.opp}</span><span>${res} ${r.pf}-${r.pa}</span>
+          <span class="r">${lineTxt(r.line)}</span>
+          <span class="ctr stack"><b class="res ${r.ats === "W" ? "cov" : r.ats === "L" ? "miss" : ""}">${r.ats || "–"}</b><small class="${sgnCls(r.am)}">${r.am == null ? "" : sgn(r.am, 1).replace(".0", "")}</small></span>
+          <span class="r">${r.tl ?? "–"}</span>
+          <span class="ctr stack"><b class="res ${r.ou === "OVER" ? "over" : r.ou === "UNDER" ? "under" : ""}">${r.ou === "OVER" ? "O" : r.ou === "UNDER" ? "U" : r.ou ? "P" : "–"}</b><small class="${sgnCls(od)}">${od == null ? "" : sgn(od, 1).replace(".0", "")}</small></span>
+        </div>`;
+      }).join("")}` : `<p class="meta">No completed games yet.</p>`}
+    </div>`;
+  }).join("") + `<p class="meta">Line is the team's spread (− = favored). The number under ATS is how many points the team beat (+) or missed (−) the spread by; under O/U it's total points minus the closing total. Playoff games are labeled WC, DIV, CONF and SB.</p>`;
+}
+
+const TAG_TEXT = {out: "Out", doubtful: "Doubtful", questionable: "Questionable", limited: "Limited practice"};
+function tagFor(p){
+  if (p.x === "active") return "";
+  const label = p.x === "out" ? (SHORT[p.rs] || "OUT") : p.x === "doubtful" ? "D" : p.x === "questionable" ? "Q" : "LP";
+  return `<span class="tag ${p.x}">${label}</span>`;
+}
+function depthGrid(t, side){
+  const av = currentWeek().avail?.[t];
+  const players = (av?.depth || []).filter(p => p.s === side);
+  if (!players.length) return `<p class="meta">No depth chart loaded.</p>`;
+  const rows = new Map();
+  for (const p of players){
+    const k = p.sl ?? p.p;
+    if (!rows.has(k)) rows.set(k, []);
+    rows.get(k).push(p);
+  }
+  const sel = state.depthSel;
+  let selP = null, selDepth = null;
+  const body = [...rows.values()].map((ps, ri) => {
+    ps.sort((a, b) => a.r - b.r);
+    const cells = [0, 1, 2, 3].map(i => {
+      const p = ps[i];
+      if (!p) return `<div class="dc ${i ? "" : "st"}"><span class="soft">–</span></div>`;
+      const key = `${t}|${p.p}|${p.n}`;
+      if (key === sel){ selP = p; selDepth = ["starter", "2nd", "3rd", "4th"][i]; }
+      const inner = p.x === "active"
+        ? `<span>${esc(p.n)}</span>`
+        : `<button type="button" class="dbtn ${key === sel ? "on" : ""}" data-dsel="${esc(key)}">${esc(p.n)} ${tagFor(p)}</button>`;
+      return `<div class="dc ${i ? "" : "st"}">${inner}</div>`;
+    }).join("");
+    return `<div class="dr ${ri % 2 ? "alt" : ""}"><div class="dp num">${esc(ps[0].p)}</div>${cells}</div>`;
+  }).join("");
+  const form = players[0].f || "";
+  const detail = selP ? (() => {
+    const bits = [];
+    if (selP.inj) bits.push(esc(selP.inj));
+    if (selP.pr) bits.push(esc(selP.pr.replace(" Participation in Practice", " practice").replace(" in Practice", "")));
+    if (selP.rs && !SHORT[selP.rs] && selP.rs !== TAG_TEXT[selP.x] && !selP.inj) bits.push(esc(selP.rs));
+    if (selP.sh != null) bits.push(`${Math.round(selP.sh * 100)}% of snaps (${esc(selP.sb)})`);
+    if (selP.rp) bits.push(`next up ${esc(selP.rp)}${selP.rsh != null ? ` (${Math.round(selP.rsh * 100)}% of snaps)` : ""}`);
+    const tagWord = selP.x === "out" ? (selP.rs || "Out") : TAG_TEXT[selP.x];
+    return `<div class="dsel ${selP.x}"><div class="dsel-h"><b>${esc(selP.n)} <small class="num">${esc(selP.p)} · ${selDepth}</small></b><span class="tagword">${esc(tagWord)}</span></div>
+      <div>${bits.join(" · ") || "No other details on the report."}</div>
+      <button type="button" class="linkish" data-dsel="">Close</button></div>`;
+  })() : "";
+  return `<div class="card flush">
+    <div class="card-h pad"><h4>${side === "O" ? "Offense" : "Defense"}</h4><span class="soft strong">${esc(form)}</span></div>
+    <div class="dwrap"><div class="dtable">
+      <div class="dr dhead"><div class="dp"></div><div class="dc st">Starter</div><div class="dc">2nd</div><div class="dc">3rd</div><div class="dc">4th</div></div>
+      ${body}
+    </div></div>
+    ${detail}
+    <p class="meta pad">Swipe the table for 2nd–4th. Tap a tagged player for injury details.</p>
+  </div>`;
+}
+function changesBox(t){
+  const c = D.teamx?.[t]?.changes;
+  if (!c) return "";
+  const pct = v => v == null ? "" : `${Math.round(v * 100)}%`;
+  const newTxt = n => n.how === "added" ? `was ${n.from} · ${pct(n.share)} of snaps` : n.how === "promoted" ? `promoted · was ${pct(n.share)}` : "no 2025 NFL snaps";
+  const person = (x, label) => !x.now ? "–" : `${esc(x.now)} ${x.changed ? `<b class="chg">new · was ${esc(x.prior)}</b>` : `<span class="soft">(same as ${D.season - 1})</span>`}`;
+  const whereCls = w => w.startsWith("now ") || w === "not on a roster" ? "gone" : "";
+  return `<div class="card changes">
+    <h4>Key changes vs ${D.season - 1}</h4>
+    <p>${c.new_starters.length} of ${c.starters} starting spots changed since ${D.season - 1}${c.qb.changed || c.coach.changed ? ", including the " + [c.qb.changed ? "quarterback" : "", c.coach.changed ? "head coach" : ""].filter(Boolean).join(" and ") : ""}. Last season's records were built with a different lineup.</p>
+    <div class="kv"><span class="soft">QB</span><span>${person(c.qb)}</span><span class="soft">Coach</span><span>${person(c.coach)}</span></div>
+    <h5>New starters</h5>
+    ${c.new_starters.length ? c.new_starters.map(n => `<div class="chrow"><span class="num soft">${esc(n.pos)}</span><span class="nm">${esc(n.name)}</span><span class="soft r">${newTxt(n)}</span></div>`).join("") : `<p class="meta">Same starters as last season.</p>`}
+    <h5>Gone from ${D.season - 1}'s starting lineup</h5>
+    ${c.lost_starters.length ? c.lost_starters.map(n => `<div class="chrow"><span class="num soft">${esc(n.pos)}</span><span class="nm">${esc(n.name)} <small class="num soft">${pct(n.share)}</small></span><span class="r ${whereCls(n.where)}">${esc(n.where)}</span></div>`).join("") : `<p class="meta">Every 50%+ snap player from last season is still starting.</p>`}
+    <p class="meta">Starters come from the latest depth chart; "starter last season" means 50%+ of snaps over 6+ games. Name matching between data sources can occasionally miss a player.</p>
+  </div>`;
+}
+function rosterPane(t){
+  const av = currentWeek().avail?.[t];
+  const note = !av ? "" : av.report_week == null ? "No injury report has been filed yet this season."
+    : av.current ? `Week ${av.report_week} injury report.`
+    : `The week ${av.week} injury report isn't out yet (teams file Wednesday to Friday), so tags come from week ${av.report_week}.`;
+  return `${changesBox(t)}${depthGrid(t, "O")}${depthGrid(t, "D")}
+    <p class="meta">${note} Tags: Q questionable, D doubtful, OUT, IR injured reserve, PUP / NFI other reserve lists, RES other reserve list, LP limited practice. Depth chart snapshot ${esc(av?.snapshot || "")}.</p>`;
+}
+function splitCell(x, right){
+  if (!x || !x.n) return `<span class="c ${right ? "r" : "l"} stack2"><span class="num">–</span><small class="soft">no games</small></span>`;
+  const m = `<span class="${sgnCls(x.m)}">${sgn(x.m)}</span>`;
+  return `<span class="c ${right ? "r" : "l"} stack2">
+    <span class="num big">${right ? m + " " + esc(x.rec) : esc(x.rec) + " " + m}</span>
+    <small class="num soft">n=${x.n}${x.moe != null ? " · ±" + Math.round(x.moe) : ""}</small>
+    ${x.sig ? `<span class="sig">signal</span>` : ""}</span>`;
+}
+function barsBlock(g, kind){
+  const col = side => {
+    const t = g[side];
+    const rows = (g.trends?.[side]?.recent || []).map(r => ({opp: r.opp, v: kind === "ats" ? r.m : (r.tot != null && r.tl != null ? r.tot - r.tl : null)}));
+    const max = Math.max(1, ...rows.map(r => Math.abs(r.v ?? 0)));
+    return `<div class="bars"><b>${t}</b>${rows.map(r => `<div class="bar-row"><span class="num soft">${r.opp}</span>
+      <span class="bar-track">${r.v == null ? "" : `<i class="${r.v > 0 ? "up" : "down"}" style="width:${(Math.abs(r.v) / max * 50).toFixed(1)}%"></i>`}</span>
+      <span class="num r">${r.v == null ? "–" : sgn(r.v, 1).replace(".0", "")}</span></div>`).join("")}</div>`;
+  };
+  return `<div class="card"><h4>Last 10 games · ${kind === "ats" ? "cover margin" : "points vs total"}</h4>
+    <div class="bars2">${col("away")}${col("home")}</div>
+    <p class="meta">Oldest at top. Blue = ${kind === "ats" ? "covered" : "over"}, orange = ${kind === "ats" ? "missed" : "under"}. Includes playoffs and last season.</p></div>`;
+}
+function splitsPane(g, kind){
+  const A = g.splits?.away || [], H = g.splits?.home || [];
+  const rows = A.map((a, i) => {
+    const h = H[i] || {};
+    const sub = a.label === "Head to head" ? `since ${a.sub.split("since ")[1] || ""}`
+      : a.label === "All games" ? a.sub : `${g.away} ${a.sub.replace("on the road", "road").replace("at home", "home")} · ${g.home} ${(h.sub || "").replace("on the road", "road").replace("at home", "home")}`;
+    return mrow(splitCell(a[kind]), mid(a.label, sub), splitCell(h[kind], true));
+  }).join("");
+  return `<div class="card">
+    <h4>${kind === "ats" ? "ATS splits" : "O/U splits"}</h4>
+    <p class="meta tight">${kind === "ats" ? "Record (W-L) and average margin vs the spread" : "Record (overs-unders) and average points vs the total"}, ${D.season - 2}–${String(D.season).slice(2)} unless noted</p>
+    <div class="mhead"><span><b>${g.away}</b></span><span></span><span><b>${g.home}</b></span></div>
+    ${rows}
+    <p class="meta">n = games, ± = 95% margin of error. "signal" appears only with 10+ games and a record farther from 50% than the margin of error.</p>
+  </div>${barsBlock(g, kind)}`;
+}
+
+function renderGame(g, tab){
+  if (!GTABS.some(([k]) => k === tab)) tab = "logs";
+  if (!state.gameTeam || ![g.away, g.home].includes(state.gameTeam)) state.gameTeam = g.away;
+  const team = state.gameTeam;
+  const when = `${fmtDate(g.date, g.weekday)} · ${fmtKick(g.time)} ET`;
+  const pane = tab === "logs" ? teamSwitch(g, team) + logsPane(team)
+    : tab === "roster" ? teamSwitch(g, team) + rosterPane(team)
+    : splitsPane(g, tab);
+  app.innerHTML = `<div class="gpage">
+    <div class="ghero">
+      <div class="ghero-top"><a href="#" class="back">‹ Week ${currentWeek().week}</a><span>${esc(when)}</span></div>
+      <div class="ghero-main">
+        <div><h2>${g.away}<span class="at">@</span>${g.home}</h2><p>${TEAM_FULL(g.away)} at ${TEAM_FULL(g.home)}${g.stadium ? " · " + esc(g.stadium) : ""}</p></div>
+        <div class="chips2"><div class="chipbox hot"><small>SPREAD</small><b class="num">${esc(spreadText(g))}</b></div><div class="chipbox"><small>O/U</small><b class="num">${g.total ?? "–"}</b></div></div>
+      </div>
+      ${finalStrip(g)}
+      ${weatherStrip(g, true)}
+    </div>
+    <nav class="gtabs" role="tablist">${GTABS.map(([k, l]) => `<a role="tab" href="#game=${g.id}&tab=${k}" aria-selected="${k === tab}">${l}</a>`).join("")}</nav>
+    <div class="gbody">${pane}</div>
+  </div>`;
 }
 
 function teamAvailability(t){
@@ -681,6 +1085,7 @@ function renderTeams(){
 }
 
 function render(){
+  if (parseRoute().game && state.view !== "week"){ state.view = "week"; }
   document.getElementById("tab-week").setAttribute("aria-pressed", state.view === "week");
   document.getElementById("tab-teams").setAttribute("aria-pressed", state.view === "teams");
   (state.view === "teams" ? renderTeams : renderWeek)();
@@ -691,9 +1096,32 @@ document.getElementById("stamp").textContent =
 
 document.querySelector(".top .seg").addEventListener("click", e => {
   const b = e.target.closest("button[data-view]"); if (!b) return;
-  state.view = b.dataset.view; store.set("view", state.view); render(); window.scrollTo(0, 0);
+  state.view = b.dataset.view; store.set("view", state.view);
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  render(); window.scrollTo(0, 0);
 });
 app.addEventListener("click", e => {
+  const tv = e.target.closest("button[data-tile]");
+  if (tv){
+    state.tileView[tv.dataset.tile] = tv.dataset.v;
+    const el = document.getElementById("g-" + tv.dataset.tile);
+    if (el) el.outerHTML = gameTile(findGame(tv.dataset.tile));
+    return;
+  }
+  const gt = e.target.closest("button[data-gteam]");
+  if (gt){ state.gameTeam = gt.dataset.gteam; state.depthSel = null; render(); return; }
+  const ds = e.target.closest("button[data-dsel]");
+  if (ds){ state.depthSel = ds.dataset.dsel && ds.dataset.dsel !== state.depthSel ? ds.dataset.dsel : null; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+  const back = e.target.closest("a.back");
+  if (back){
+    e.preventDefault();
+    const id = parseRoute().game;
+    history.pushState(null, "", location.pathname + location.search);
+    render();
+    const el = id && document.getElementById("g-" + id);
+    if (el) el.scrollIntoView({block: "start"}); else window.scrollTo(0, 0);
+    return;
+  }
   const w = e.target.closest("button[data-week]");
   if (w){ state.week = Number(w.dataset.week); store.set("week", state.week); render(); return; }
   const t = e.target.closest("button[data-team]");
@@ -737,6 +1165,17 @@ app.addEventListener("pointermove", showTip);
 app.addEventListener("pointerdown", showTip);
 app.addEventListener("pointerleave", () => { tip.hidden = true; });
 window.addEventListener("scroll", () => { tip.hidden = true; }, {passive: true});
+
+let lastGame = parseRoute().game;
+window.addEventListener("hashchange", () => {
+  const r = parseRoute();
+  if (r.game !== lastGame){ state.depthSel = null; state.gameTeam = null; }
+  const wasGame = lastGame;
+  lastGame = r.game;
+  render();
+  if (r.game && r.game !== wasGame) window.scrollTo(0, 0);
+  else if (!r.game && wasGame){ const el = document.getElementById("g-" + wasGame); if (el) el.scrollIntoView({block: "start"}); }
+});
 
 render();
 })();

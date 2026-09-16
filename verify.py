@@ -328,6 +328,63 @@ check("pace looks like football: 25-40 s between snaps, 45-60% neutral passing, 
       25 <= r["sec"] <= 40 and 0.45 <= r["npass"] <= 0.60 and 0.06 <= r["expl"] <= 0.12,
       f"{r['sec']:.1f} s, {r['npass']:.1%} pass, {r['expl']:.1%} explosive")
 
+# ---------------------------------------------------------------------------
+# Game page: splits, logs, roster changes, depth grid, weather
+# ---------------------------------------------------------------------------
+from datetime import datetime, timezone
+from sources.weather import pick_hour, kickoff_utc, roof_type
+
+sp = queries.game_splits("BUF", "DET", "home", 4.5, "2026-09-17", conn=conn)
+allg = sp[0]
+w, l, p_ = (int(x) for x in (allg["record"].split("-") + ["0"])[:3])
+check("game splits: 'All games' W+L+P equals games counted",
+      w + l + p_ == allg["games"], f"{allg['record']} vs {allg['games']} games")
+check("game splits: venue and role slices are never bigger than all games",
+      all(r["games"] <= allg["games"] for r in sp if r["label"] != "Head to head"),
+      ", ".join(f"{r['label']} {r['games']}" for r in sp))
+h2h = queries._team_games(conn, "BUF", "2026-09-17")
+h2h = h2h[(h2h["opponent"] == "DET") & (h2h["season"] >= queries.H2H_START)]
+check("game splits: head to head counts only games vs that opponent",
+      sp[-1]["games"] == len(h2h), f"{sp[-1]['games']} vs {len(h2h)}")
+
+lg = queries.team_log("DET", conn=conn)
+check("game log is newest first and covers only this season and last",
+      lg["gameday"].is_monotonic_decreasing and set(lg["season"]) <= {queries.CURRENT_SEASON, queries.CURRENT_SEASON - 1},
+      f"{len(lg)} games")
+
+check("name matching treats Greg / Gregory and Jr. suffixes as the same player",
+      queries.name_key("Greg Rousseau") == queries.name_key("Gregory Rousseau")
+      and queries.name_key("Michael Penix Jr.") == queries.name_key("Michael Penix"))
+rc = queries.roster_changes("BUF", conn=conn)
+check("roster changes: new starters never exceed starting spots, lost starters were 50%+ players",
+      len(rc["new_starters"]) <= rc["starters"] and all(x["share"] >= 0.5 for x in rc["lost_starters"]),
+      f"{len(rc['new_starters'])} new of {rc['starters']}, {len(rc['lost_starters'])} lost")
+cur = {queries.name_key(r["player_name"]) for r in conn.execute(
+    "SELECT player_name FROM depth_chart WHERE team = 'BUF' AND side IN ('O','D')")}
+gone = [x for x in rc["lost_starters"] if x["where"].startswith("now ") or x["where"] == "not on a roster"]
+check("roster changes: players listed as gone aren't on the team's current depth chart",
+      not any(queries.name_key(x["name"]) in cur for x in gone), f"{len(gone)} gone")
+
+av = queries.availability("BUF", conn=conn)["depth"]
+od = av[av["side"].isin(["O", "D"])]
+check("depth grid: every offense/defense row has a slot, and each slot has one starter",
+      od["pos_slot"].notna().all() and (od.groupby(["side", "pos_slot"])["pos_rank"].min().notna().all()),
+      f"{len(od.groupby(['side', 'pos_slot']))} slots")
+
+ko = kickoff_utc("2026-09-17", "20:15")
+check("weather: 8:15 PM Eastern in September is 00:15 UTC the next day",
+      ko == datetime(2026, 9, 18, 0, 15, tzinfo=timezone.utc), ko.isoformat())
+hourly = {"time": ["2026-09-17T23:00", "2026-09-18T00:00", "2026-09-18T01:00"],
+          "temperature_2m": [60, 61, 59], "wind_speed_10m": [10, 16, 12],
+          "wind_gusts_10m": [15, 24, 18], "precipitation_probability": [30, 40, 50]}
+h = pick_hour(hourly, ko)
+check("weather: picks the forecast hour closest to kickoff, and none if the gap is over 90 min",
+      h is not None and h["time"] == "2026-09-18T00:00" and h["wind_mph"] == 16
+      and pick_hour(hourly, datetime(2026, 9, 18, 6, 0, tzinfo=timezone.utc)) is None, str(h))
+check("weather: domes are skipped, retractable roofs and open stadiums are not",
+      roof_type("DET", "Home", None, None) == "dome" and roof_type("ATL", "Home", None, None) == "retractable"
+      and roof_type("BUF", "Home", None, "outdoors") == "open" and roof_type("BUF", "Home", None, "closed") == "dome")
+
 conn.close()
 
 # ---------------------------------------------------------------------------

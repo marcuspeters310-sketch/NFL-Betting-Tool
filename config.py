@@ -38,6 +38,12 @@ INJURIES_URL = NFLVERSE_RELEASE + "/injuries/injuries_{season}.csv.gz"
 WEEKLY_ROSTERS_URL = NFLVERSE_RELEASE + "/weekly_rosters/roster_weekly_{season}.csv.gz"
 SNAP_COUNTS_URL = NFLVERSE_RELEASE + "/snap_counts/snap_counts_{season}.csv.gz"
 
+# Weather: Open-Meteo forecast API (free, no key). Forecasts reach 16 days out.
+WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+WEATHER_DAYS_AHEAD = 10          # only fetch games kicking off within this many days
+WIND_FLAG_MPH = 15               # flag a game at or above this sustained wind
+RAIN_FLAG_PCT = 50               # ... or at or above this chance of precipitation
+
 FIRST_SEASON = 1999          # earliest season nflverse carries betting lines for
 CURRENT_SEASON = 2026
 

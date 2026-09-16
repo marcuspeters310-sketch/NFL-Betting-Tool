@@ -249,6 +249,22 @@ CREATE TABLE IF NOT EXISTS line_snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_snap_game ON line_snapshots(game_id, market, captured_at);
+
+-- ---------------------------------------------------------------------------
+-- weather_forecasts: the latest kickoff-hour forecast for upcoming outdoor
+-- (and retractable-roof) games, from Open-Meteo (free, no key). One row per
+-- game, replaced on every refresh. Indoor games get no row.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS weather_forecasts (
+    game_id       TEXT PRIMARY KEY,
+    fetched_at    TEXT NOT NULL,      -- UTC ISO timestamp of the fetch
+    kickoff_utc   TEXT,               -- the forecast hour used
+    temp_f        REAL,
+    wind_mph      REAL,
+    gust_mph      REAL,
+    precip_pct    REAL,               -- chance of precipitation, 0-100
+    source        TEXT
+);
 """
 
 # ---------------------------------------------------------------------------

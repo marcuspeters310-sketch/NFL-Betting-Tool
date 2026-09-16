@@ -16,6 +16,7 @@ import sys
 from sources.nflverse import load_games
 from sources.pbp import load_pbp
 from sources.rosters import load_availability
+from sources.weather import load_weather
 from config import DB_PATH
 
 
@@ -58,6 +59,12 @@ def main() -> None:
     print("\nLoading depth charts, injury reports, roster status, snap counts...")
     for name, msg in load_availability(conn).items():
         print(f"  {name}: {msg}")
+
+    print("\nLoading kickoff weather forecasts (Open-Meteo)...")
+    try:
+        print(f"  {load_weather(conn)}")
+    except Exception as exc:   # weather is a nice-to-have; never block a refresh
+        print(f"  FAILED ({exc.__class__.__name__}: {str(exc)[:80]})")
 
     conn.close()
 

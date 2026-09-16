@@ -14,6 +14,8 @@ it is showing you.
 from __future__ import annotations
 
 import math
+import re
+import sqlite3
 from typing import Optional
 
 import pandas as pd
@@ -796,6 +798,7 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
         share, basis = share_of(gid)
         rows.append({
             "side": d["side"], "formation": d["formation"], "pos_abb": d["pos_abb"],
+            "pos_slot": None if pd.isna(d["pos_slot"]) else int(d["pos_slot"]),
             "pos_rank": int(d["pos_rank"]),
             "starter": int(d["pos_rank"]) <= STARTERS_AT.get(d["pos_abb"], 1),
             "player_name": _s(d["player_name"]) or "(unnamed)", "gsis_id": gid,
@@ -1166,4 +1169,291 @@ def luck_table(season: int = CURRENT_SEASON, before_week: Optional[int] = None,
         flags.append(f)
     out["flags"] = flags
     out.index.name = "team"
+    return out
+
+
+# ===========================================================================
+# Game page: splits, game logs, roster changes, weather
+# ===========================================================================
+
+SPLIT_SEASONS = 3            # "All games" on the game page = this season + the two before
+
+
+def game_splits(team: str, opponent: str, side: str, team_spread: Optional[float],
+                before: Optional[str], season: int = CURRENT_SEASON, conn=None) -> list[dict]:
+    """
+    ATS and over/under splits for one team going into one game: all games,
+    this venue, this role (favorite / underdog), venue + role, and head to
+    head. Only games before `before` count.
+
+    team_spread follows v_team_games: positive = this team is favored.
+    Each row is summarize_games() plus "label" and "sub".
+    """
+    close = conn is None
+    conn = conn or connect(read_only=True)
+    games = _team_games(conn, team, before)
+    if close:
+        conn.close()
+    first = season - SPLIT_SEASONS + 1
+    since = games[games["season"] >= first]
+    venue_word = "home" if side == "home" else "road"
+    at_venue = since[since["side"] == side]
+    if team_spread is None or pd.isna(team_spread):
+        role_word, role = None, None
+    elif team_spread > 0:
+        role_word, role = "favorite", since["team_spread"] > 0
+    elif team_spread < 0:
+        role_word, role = "underdog", since["team_spread"] < 0
+    else:
+        role_word, role = "pick'em", since["team_spread"] == 0
+    rows = [("All games", f"{first}–{str(season)[2:]}", since),
+            ("This venue", f"at {venue_word}" if side == "home" else "on the road", at_venue)]
+    if role is not None:
+        rows.append(("This role", f"as {role_word}", since[role]))
+        rows.append(("Venue + role", f"{venue_word} {'dog' if role_word == 'underdog' else role_word}",
+                     at_venue[role.loc[at_venue.index]]))
+    h2h = games[(games["opponent"] == opponent) & (games["season"] >= H2H_START)]
+    rows.append(("Head to head", f"vs {opponent} since {H2H_START}", h2h))
+    out = []
+    for label, sub, df in rows:
+        r = summarize_games(df)
+        r.update(label=label, sub=sub)
+        out.append(r)
+    return out
+
+
+def team_log(team: str, seasons: tuple = (CURRENT_SEASON, CURRENT_SEASON - 1), conn=None) -> pd.DataFrame:
+    """Every completed game (playoffs included) in the given seasons, newest first."""
+    close = conn is None
+    conn = conn or connect(read_only=True)
+    marks = ",".join("?" * len(seasons))
+    df = pd.read_sql_query(f"""
+        SELECT season, week, game_type, gameday, opponent, side, points_for, points_against,
+               team_spread, ats_margin, ats, total_line, total, ou_result
+        FROM v_team_games
+        WHERE team = ? AND season IN ({marks}) AND points_for IS NOT NULL
+        ORDER BY gameday DESC
+    """, conn, params=[team, *seasons])
+    if close:
+        conn.close()
+    return df
+
+
+_SUFFIX = re.compile(r"\b(jr|sr|ii|iii|iv|v)\b\.?")
+_NICK = {"greg": "gregory", "mike": "michael", "matt": "matthew", "chris": "christopher",
+         "josh": "joshua", "nick": "nicholas", "dan": "daniel", "danny": "daniel", "joe": "joseph",
+         "tom": "thomas", "will": "william", "jon": "jonathan", "rob": "robert", "bob": "robert",
+         "alex": "alexander", "zach": "zachary", "cam": "cameron", "jake": "jacob", "ben": "benjamin",
+         "sam": "samuel", "tony": "anthony", "andy": "andrew", "drew": "andrew", "ted": "theodore",
+         "jim": "james", "jimmy": "james", "bill": "william", "dave": "david", "steve": "steven",
+         "pat": "patrick", "rich": "richard", "rick": "richard", "ken": "kenneth", "ed": "edward"}
+
+
+def name_key(name) -> str:
+    """Loose player-name key so 'Greg Rousseau' matches 'Gregory Rousseau'."""
+    s = _s(name) or ""
+    s = _SUFFIX.sub("", s.lower().replace(".", "").replace("'", ""))
+    parts = [re.sub(r"[^a-z]", "", p) for p in s.replace("-", " ").split()]
+    parts = [p for p in parts if p]
+    if not parts:
+        return ""
+    parts[0] = _NICK.get(parts[0], parts[0])
+    return " ".join(parts)
+
+
+def _last_key(key: str) -> str:
+    return key.split()[-1] if key else ""
+
+
+def _unique_short(df: pd.DataFrame) -> dict:
+    """{(first initial, last name): row} for rows (indexed by name_key) whose short form is unique."""
+    seen: dict = {}
+    for k, row in df.iterrows():
+        sh = (k[:1], _last_key(k))
+        seen[sh] = None if sh in seen else row
+    return {k: v for k, v in seen.items() if v is not None}
+
+
+def roster_changes(team: str, season: int = CURRENT_SEASON, min_share: float = 0.5,
+                   min_games: int = 6, conn=None) -> dict:
+    """
+    What changed since last season, so last season's ATS / O/U records can be
+    read in context:
+
+      qb, coach      {"now", "prior", "changed"}
+      new_starters   current starters who weren't a 50%+ snap player for this
+                     team last season (with where they were, and their share)
+      lost_starters  last season's 50%+ snap players who aren't starting now
+                     (with where they are now)
+      starters       number of starting spots (offense + defense)
+    """
+    close = conn is None
+    conn = conn or connect(read_only=True)
+    prior = season - 1
+
+    snaps = pd.read_sql_query("""
+        SELECT team, player, position,
+               CASE WHEN offense_pct >= defense_pct THEN offense_pct ELSE defense_pct END AS pct
+        FROM snap_counts WHERE season = ? AND game_type = 'REG'
+    """, conn, params=[prior])
+    depth = pd.read_sql_query("""
+        SELECT side, pos_abb, pos_rank, player_name FROM depth_chart
+        WHERE team = ? AND side IN ('O', 'D')
+    """, conn, params=[team])
+    roster = pd.read_sql_query("""
+        SELECT team, full_name, status, status_code, week FROM roster_status WHERE season = ?
+    """, conn, params=[season])
+    qb_prior = conn.execute("""
+        SELECT qb, COUNT(*) n FROM (
+          SELECT CASE WHEN home_team = ? THEN home_qb_name ELSE away_qb_name END AS qb
+          FROM games WHERE season = ? AND game_type = 'REG' AND result IS NOT NULL
+            AND (home_team = ? OR away_team = ?)
+        ) WHERE qb IS NOT NULL GROUP BY qb ORDER BY n DESC LIMIT 1
+    """, (team, prior, team, team)).fetchone()
+    def coach(s, played_only):
+        return conn.execute(f"""
+            SELECT CASE WHEN home_team = ? THEN home_coach ELSE away_coach END AS c
+            FROM games WHERE season = ? AND (home_team = ? OR away_team = ?)
+              {"AND result IS NOT NULL" if played_only else ""}
+              AND (CASE WHEN home_team = ? THEN home_coach ELSE away_coach END) IS NOT NULL
+            ORDER BY gameday {"DESC" if played_only else "ASC"} LIMIT 1
+        """, (team, s, team, team, team)).fetchone()
+    coach_prior = coach(prior, True)
+    coach_now = coach(season, True) or coach(season, False)
+    if close:
+        conn.close()
+
+    snaps["key"] = snaps["player"].map(name_key)
+    agg = (snaps.groupby(["key", "team"])
+                .agg(player=("player", "first"), pos=("position", "first"),
+                     games=("pct", "size"), share=("pct", "mean"))
+                .reset_index())
+    main_team = agg.sort_values("games").groupby("key").tail(1).set_index("key")
+    last_names = agg.assign(last=agg["key"].map(_last_key))
+    main_short = _unique_short(main_team)
+
+    def main_of(key):
+        """Last season's main team row for a player, tolerating 'Dee' vs 'DeAundre'."""
+        if key in main_team.index:
+            return main_team.loc[key]
+        short = (key[:1], _last_key(key))
+        return main_short.get(short)
+
+    depth["starter"] = [int(r) <= STARTERS_AT.get(p, 1) for p, r in zip(depth["pos_abb"], depth["pos_rank"])]
+    starters = depth[depth["starter"]].copy()
+    starters["key"] = starters["player_name"].map(name_key)
+    order = {s: {p: k for k, p in enumerate(v)} for s, v in POSITION_ORDER.items()}
+    starters["_o"] = [order.get(s, {}).get(p, 99) for s, p in zip(starters["side"], starters["pos_abb"])]
+    starters = starters.sort_values(["side", "_o", "pos_rank"], ascending=[False, True, True])
+
+    def with_team(key):
+        hit = agg[(agg["key"] == key) & (agg["team"] == team)]
+        if hit.empty:   # fall back to a unique last-name match on this team
+            ln = last_names[(last_names["last"] == _last_key(key)) & (last_names["team"] == team)]
+            hit = ln if len(ln) == 1 else hit
+        return hit.iloc[0] if len(hit) else None
+
+    new = []
+    for _, s in starters.iterrows():
+        mine = with_team(s["key"])
+        pos = s["pos_abb"] + (str(int(s["pos_rank"])) if s["pos_abb"] in STARTERS_AT else "")
+        if mine is not None and mine["share"] >= min_share:
+            continue
+        m = main_of(s["key"])
+        if m is not None and m["team"] != team:      # spent most of last season elsewhere
+            new.append({"pos": pos, "name": s["player_name"], "from": m["team"],
+                        "share": round(float(m["share"]), 3), "how": "added"})
+        elif mine is not None:
+            new.append({"pos": pos, "name": s["player_name"], "from": None,
+                        "share": round(float(mine["share"]), 3), "how": "promoted"})
+        else:
+            new.append({"pos": pos, "name": s["player_name"], "from": None, "share": None,
+                        "how": "no_snaps"})
+
+    now_keys = set(starters["key"])
+    now_short = {(k[:1], _last_key(k)) for k in now_keys}
+    roster["key"] = roster["full_name"].map(name_key)
+    latest = roster.sort_values("week").groupby("key").tail(1).set_index("key")
+    latest_short = _unique_short(latest)
+    lost = []
+    prior_starters = agg[(agg["team"] == team) & (agg["share"] >= min_share) & (agg["games"] >= min_games)]
+    for _, p in prior_starters.sort_values("share", ascending=False).iterrows():
+        if p["key"] in now_keys:
+            continue
+        if (p["key"][:1], _last_key(p["key"])) in now_short:
+            # Same first initial + last name starting now: the same player under a variant name.
+            continue
+        short = (p["key"][:1], _last_key(p["key"]))
+        r = latest.loc[p["key"]] if p["key"] in latest.index else \
+            latest_short.get(short)
+        if r is not None:
+            if r["team"] != team:
+                where = f"now {r['team']}"
+            elif r["status"] == "RES":
+                code = r["status_code"] if isinstance(r["status_code"], str) else ""
+                where = RESERVE_LABELS.get(code, "reserve list")
+            elif r["status"] == "DEV":
+                where = "practice squad"
+            else:
+                where = "still here, not starting"
+        else:
+            where = "not on a roster"
+        lost.append({"pos": p["pos"], "name": p["player"], "share": round(float(p["share"]), 3),
+                     "games": int(p["games"]), "where": where})
+
+    qb_now = starters[starters["pos_abb"] == "QB"]["player_name"]
+    qb_now = qb_now.iloc[0] if len(qb_now) else None
+    qbp = qb_prior["qb"] if qb_prior else None
+    cp = coach_prior["c"] if coach_prior else None
+    cn = coach_now["c"] if coach_now else None
+    return {
+        "qb": {"now": qb_now, "prior": qbp,
+               "changed": bool(qb_now and qbp and name_key(qb_now) != name_key(qbp))},
+        "coach": {"now": cn, "prior": cp, "changed": bool(cn and cp and cn != cp)},
+        "new_starters": new,
+        "lost_starters": lost,
+        "starters": int(len(starters)),
+    }
+
+
+def game_weather(game: dict, conn=None) -> dict:
+    """
+    Weather for one game (a week_slate row as a dict):
+      played game  -> nflverse's recorded temp/wind (when present)
+      upcoming     -> the stored Open-Meteo kickoff forecast
+    Returns {"roof", "temp", "wind", "gust", "precip", "flag", "source"}.
+    """
+    from sources.weather import roof_type          # local import: weather pulls in requests
+    from config import WIND_FLAG_MPH, RAIN_FLAG_PCT
+    roof = roof_type(game["home_team"], _s(game.get("location")), _s(game.get("stadium")), _s(game.get("roof")))
+    out = {"roof": roof, "temp": None, "wind": None, "gust": None, "precip": None,
+           "flag": None, "source": None}
+    if roof == "dome":
+        return out
+    played = game.get("result") is not None and not pd.isna(game.get("result"))
+    close = conn is None
+    conn = conn or connect(read_only=True)
+    try:
+        if played:
+            r = conn.execute("SELECT temp, wind FROM games WHERE game_id = ?", (game["game_id"],)).fetchone()
+            if r and (r["temp"] is not None or r["wind"] is not None):
+                out.update(temp=r["temp"], wind=r["wind"], source="recorded")
+        else:
+            try:
+                r = conn.execute("SELECT * FROM weather_forecasts WHERE game_id = ?",
+                                 (game["game_id"],)).fetchone()
+            except sqlite3.OperationalError:     # table not created yet
+                r = None
+            if r:
+                out.update(temp=r["temp_f"], wind=r["wind_mph"], gust=r["gust_mph"],
+                           precip=r["precip_pct"], source="forecast", fetched=r["fetched_at"])
+    finally:
+        if close:
+            conn.close()
+    flags = []
+    if out["wind"] is not None and out["wind"] >= WIND_FLAG_MPH:
+        flags.append(f"wind {WIND_FLAG_MPH}+ mph")
+    if out["precip"] is not None and out["precip"] >= RAIN_FLAG_PCT:
+        flags.append(f"rain {RAIN_FLAG_PCT}%+")
+    out["flag"] = " · ".join(flags) or None
     return out

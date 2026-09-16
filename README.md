@@ -16,8 +16,44 @@
   the repository is only the starting copy if the cache is empty.
 - **Keep-alive:** each run commits `data/last_refresh.txt`, because GitHub
   pauses schedules in public repositories after 60 days without a commit.
-- **Local-only files** (`app.py`, `show.py`, `Run NFL Board.bat`) are not in
-  this repository. The references to them below apply to the Windows copy.
+- **Weather:** `sources/weather.py` pulls the kickoff-hour forecast from
+  Open-Meteo (free, no key) for games in the next 10 days, stored in
+  `weather_forecasts`. Domes are skipped; retractable roofs are fetched.
+  Flags: wind 15+ mph or 50%+ chance of rain (`config.py`). A failed fetch
+  keeps the last good forecast.
+
+## The website (Sept 16 redesign)
+
+- **This week:** one tile per game. Each tile has a **Spread / Over-Under**
+  switch. Away team on the left, home on the right; each middle row pairs one
+  team's offense with the other team's defense.
+  - Spread: off EPA vs def EPA allowed, points scored vs allowed, hurt
+    starters (offense vs defense), ATS record + average margin for 2026 and
+    the last 3 / 5 / 10 games.
+  - Over/Under: points matchups, a points estimate (the average of the two
+    scoring rows vs the total, not a model), pace, hurt starters, O/U record
+    + average points vs the total for the same windows.
+  - Weather strip with the flag.
+- **Game page** (`#game=<id>&tab=...`, opened with "Details ›"):
+  - Game logs: this season and last, playoffs included, with ATS and O/U
+    results and margins (`queries.team_log`).
+  - Roster: key changes vs last season (QB, head coach, new starters, 50%+
+    snap starters who left, from `queries.roster_changes`), then an
+    ESPN-style depth chart (Starter / 2nd / 3rd / 4th) with injury tags; tap
+    a tagged player for details.
+  - ATS and O/U: all games (last 3 seasons), this venue, this role
+    (favorite / underdog), venue + role, head to head since 2015
+    (`queries.game_splits`), plus last-10 bars.
+- The model table, "most lopsided matchups" and "hurt starters" lists were
+  removed from the homepage in the redesign; the Teams view is unchanged.
+- Roster matching between data sources uses loose names (Greg = Gregory,
+  suffixes dropped, unique first-initial + last-name fallback). It can still
+  miss a player now and then.
+
+## Local-only files
+
+`app.py`, `show.py` and `Run NFL Board.bat` are not in
+this repository. The references to them below apply to the Windows copy.
 
 Phase 1: the data foundation. Every NFL game since 1999 with its closing
 spread, closing total and final score, loaded into a local SQLite database,

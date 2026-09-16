@@ -20,7 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 import queries
-from config import CURRENT_SEASON, PROJECT_ROOT
+from config import CURRENT_SEASON, PROJECT_ROOT, WIND_FLAG_MPH, RAIN_FLAG_PCT
 
 THROUGH = CURRENT_SEASON - 1   # ATS splits use completed seasons only
 N_SEASONS = 3
@@ -81,6 +81,7 @@ def recent_payload(df: pd.DataFrame) -> list:
         "pf": num(r["points_for"]), "pa": num(r["points_against"]),
         "line": num(r["team_spread"]), "m": num(r["ats_margin"]), "ats": r["ats"],
         "ou": text(r["ou_result"]), "post": r["game_type"] != "REG",
+        "tot": num(r["total"]), "tl": num(r["total_line"]),
     } for r in df.to_dict("records")]
 
 
@@ -92,6 +93,7 @@ def availability_payload(av: dict) -> dict:
         if r["side"] == "ST":
             continue
         row = {"s": r["side"], "p": r["pos_abb"], "r": int(r["pos_rank"]),
+               "sl": num(r.get("pos_slot")), "f": text(r.get("formation")),
                "st": bool(r["starter"]), "n": text(r["player_name"]) or "(unnamed)", "x": r["status"]}
         if r["status"] != "active":
             row.update({"rs": text(r["report_status"]), "inj": text(r["injury"]),
@@ -114,6 +116,30 @@ def availability_payload(av: dict) -> dict:
     }
 
 
+def splits_payload(rows: list) -> list:
+    return [{"label": r["label"], "sub": r["sub"],
+             "ats": {"rec": r["record"], "n": r["n"], "moe": num(r["moe"]), "sig": bool(r["sig"]),
+                     "m": num(r["avg_margin"])},
+             "ou": {"rec": r["ou_record"], "n": r["ou_n"], "moe": num(r["ou_moe"]), "sig": bool(r["ou_sig"]),
+                    "m": num(r["avg_total_vs_line"])}} for r in rows]
+
+
+def log_payload(df: pd.DataFrame) -> list:
+    return [{
+        "s": int(r["season"]), "wk": int(r["week"]), "gt": r["game_type"], "d": r["gameday"],
+        "opp": r["opponent"], "home": r["side"] == "home",
+        "pf": num(r["points_for"]), "pa": num(r["points_against"]),
+        "line": num(r["team_spread"]), "am": num(r["ats_margin"]), "ats": text(r["ats"]),
+        "tl": num(r["total_line"]), "tot": num(r["total"]), "ou": text(r["ou_result"]),
+    } for r in df.to_dict("records")]
+
+
+def weather_payload(w: dict) -> dict:
+    return {"roof": w["roof"], "temp": num(w["temp"]), "wind": num(w["wind"]),
+            "gust": num(w["gust"]), "precip": num(w["precip"]), "flag": w["flag"],
+            "src": w["source"], "at": w.get("fetched")}
+
+
 def luck_payload(l: pd.DataFrame, team: str):
     if l.empty or team not in l.index:
         return None
@@ -130,7 +156,7 @@ def game_payload(g) -> dict:
         "id": g["game_id"], "date": g["gameday"], "weekday": g["weekday"],
         "time": g["gametime"], "away": g["away_team"], "home": g["home_team"],
         "spread": num(g["spread_line"]), "total": num(g["total_line"]),
-        "roof": text(g["roof"]), "stadium": text(g["stadium"]),
+        "roof": text(g["roof"]), "stadium": text(g["stadium"]), "neutral": g["location"] == "Neutral",
         "div": int(num(g["div_game"]) or 0), "prime": int(num(g["is_primetime"]) or 0),
         "away_rest": num(g["away_rest"]), "home_rest": num(g["home_rest"]),
         "final": {
@@ -162,6 +188,15 @@ def main() -> None:
                     "model_margin", "market_margin", "spread_edge", "model_total",
                     "market_total", "total_edge", "home_rating", "away_rating")}
                 gp["model"].update({"side": text(mr["model_side"]), "lean": text(mr["total_lean"])})
+            gp["wx"] = weather_payload(queries.game_weather(g.to_dict(), conn=conn))
+            spread = num(g["spread_line"])
+            gp["splits"] = {
+                side: splits_payload(queries.game_splits(
+                    g[f"{side}_team"], g[("home" if side == "away" else "away") + "_team"], side,
+                    None if spread is None else (spread if side == "home" else -spread),
+                    g["gameday"], conn=conn))
+                for side in ("away", "home")
+            }
             gp["trends"] = {
                 side: {
                     "angles": angles_payload(queries.ats_angles(
@@ -180,6 +215,12 @@ def main() -> None:
             "avail": {t: availability_payload(queries.availability(t, CURRENT_SEASON, w, conn=conn))
                       for t in set(slate["home_team"]) | set(slate["away_team"])},
         })
+
+    # Game-page extras for every team on an exported slate: game logs for this
+    # season and last, and what changed on the roster since last season.
+    slate_teams = sorted({t for wk in weeks for g in wk["games"] for t in (g["away"], g["home"])})
+    teamx = {t: {"log": log_payload(queries.team_log(t, conn=conn)),
+                 "changes": queries.roster_changes(t, conn=conn)} for t in slate_teams}
 
     luck_now = queries.luck_table(CURRENT_SEASON, None, conn=conn)
     luck_prior = queries.luck_table(CURRENT_SEASON - 1, None, conn=conn)
@@ -224,9 +265,11 @@ def main() -> None:
         },
         "weeks": weeks,
         "teams": teams,
+        "teamx": teamx,
         "latest_metrics": metrics_payload(latest, CURRENT_SEASON) if not latest.empty else {},
         "pace_defs": [[k, label] for k, label, _f, _hb in queries.PACE],
         "backtest": backtest,
+        "weather_flags": {"wind": WIND_FLAG_MPH, "rain": RAIN_FLAG_PCT},
     }
 
     # NaN is not valid JSON and would stop the web page from loading, so clean
