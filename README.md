@@ -22,11 +22,21 @@
   Flags: wind 15+ mph or 50%+ chance of rain (`config.py`). A failed fetch
   keeps the last good forecast.
 
-## The website (Sept 16 redesign)
+## The website (Sept 16 redesign; week visibility + results Sept 23)
 
-- **This week:** one tile per game. Each tile has a **Spread / Over-Under**
-  switch. Away team on the left, home on the right; each middle row pairs one
-  team's offense with the other team's defense.
+- **Which weeks show up:** the current week (the earliest one with an
+  unplayed game) is always there. Next week joins it every day except the
+  one Tuesday right after this week's Monday Night Football ends -- by
+  Wednesday, next week's tiles are visible too, all the way through its own
+  Monday night, at which point it becomes "current" and the week after it
+  takes the "next week" slot. Logic: `export_board.show_next_week` /
+  `determine_weeks`. Every week that's fully played gets a **results**
+  entry in the same week switcher (see below).
+- **This week / next week tiles:** each tile opens **condensed** -- teams,
+  kickoff, the spread, and each team's last-3-games ATS and O/U record --
+  so several fit on a phone screen at once. Tap **More ▼** to expand to the
+  full tile: the Spread / Over-Under switch, weather, and the offense-vs-
+  defense matchup rows (away team on the left, home on the right).
   - Spread: off EPA vs def EPA allowed, points scored vs allowed, hurt
     starters (offense vs defense), ATS record + average margin for 2026 and
     the last 3 / 5 / 10 games.
@@ -34,18 +44,39 @@
     scoring rows vs the total, not a model), pace, hurt starters, O/U record
     + average points vs the total for the same windows.
   - Weather strip with the flag.
+- **Results weeks:** once a week is fully played it switches to a light
+  results view -- final score plus what actually happened on the field
+  (EPA/play, success rate, yards, red zone and third-down rate, giveaways,
+  sacks, explosive-play rate for both teams, from `queries.game_box_score`,
+  a plain read of that game's `team_game_stats` row -- not the blended,
+  ranked season metrics). No spread, no cover, no model: on purpose, so the
+  history reads as "what happened" rather than "how the bet went."
+- **Hurt last game:** the official injury report only exists Wednesday to
+  Friday. Before that, the Injuries tab (game page) and each team's
+  availability panel (Teams page) show who the play-by-play flagged as
+  injured in that team's most recently completed game -- "Returned to that
+  game" or "Did not return" -- parsed straight out of the same play-by-play
+  download already used for team stats (`sources.pbp.parse_injuries`,
+  `game_injury_events` table, `queries.hurt_last_game`). It's the NFL's own
+  gamebook charting, not a diagnosis: it knows what happened on the field
+  that day, nothing about a Monday MRI or a setback at practice. Suppressed
+  automatically once that week's real report is out.
 - **Game page** (`#game=<id>&tab=...`, opened with "Details ›"):
   - Game logs: this season and last, playoffs included, with ATS and O/U
     results and margins (`queries.team_log`).
   - Roster: key changes vs last season (QB, head coach, new starters, 50%+
-    snap starters who left, from `queries.roster_changes`), then an
-    ESPN-style depth chart (Starter / 2nd / 3rd / 4th) with injury tags; tap
-    a tagged player for details.
+    snap starters who left, from `queries.roster_changes`), the "Hurt last
+    game" note above when it applies, then an ESPN-style depth chart
+    (Starter / 2nd / 3rd / 4th) with injury tags; tap a tagged player for
+    details.
   - ATS and O/U: all games (last 3 seasons), this venue, this role
     (favorite / underdog), venue + role, head to head since 2015
-    (`queries.game_splits`), plus last-10 bars.
+    (`queries.game_splits`), plus a cover-margin / points-vs-total bar chart
+    covering every game since the start of 2025 (`CHART_SINCE_SEASON` in
+    `config.py`), most recent game at the top.
 - The model table, "most lopsided matchups" and "hurt starters" lists were
-  removed from the homepage in the redesign; the Teams view is unchanged.
+  removed from the homepage in the redesign; the Teams view is unchanged
+  (its own "last 10 games" trend chart is still a fixed 10-game window).
 - Roster matching between data sources uses loose names (Greg = Gregory,
   suffixes dropped, unique first-initial + last-name fallback). It can still
   miss a player now and then.
@@ -263,7 +294,7 @@ into it, so `web\NFL Board.html` also opens fine straight from your folder.
 ## Command line
 
 ```
-python verify.py              # 38 checks — run this first
+python verify.py              # 63 checks — run this first
 python show.py slate          # this week's games in kickoff order
 python show.py slate 2025 12  # any past week, with results and ATS outcomes
 python show.py team CHI       # Bears ATS splits, last 3 seasons
@@ -299,17 +330,17 @@ returns `n` alongside the percentage.
 
 | File | Role |
 |---|---|
-| `config.py` | Paths, URLs, season constants. One place to change anything. |
-| `db.py` | Connection, table definitions, and the derived SQL views. The interesting part. |
+| `config.py` | Paths, URLs, season constants, `CHART_SINCE_SEASON` for the ATS chart. One place to change anything. |
+| `db.py` | Connection, table definitions (including `game_injury_events`), and the derived SQL views. The interesting part. |
 | `sources/nflverse.py` | Downloads the nflverse games file and upserts it. Safe to re-run any time. |
-| `sources/pbp.py` | Downloads play-by-play and adds it up to one row per team per game (`team_game_stats`), including pace, neutral pass rate, explosives and fumbles. Loads 2024-2026 (2024 only for the model backtest). |
+| `sources/pbp.py` | Downloads play-by-play and adds it up to one row per team per game (`team_game_stats`), including pace, neutral pass rate, explosives and fumbles. Also regexes "was injured during the play" / "has returned to the game" out of the same download into `game_injury_events` (`parse_injuries`). Loads 2024-2026 (2024 only for the model backtest). |
 | `sources/rosters.py` | Depth charts (latest daily snapshot), injury reports, weekly roster status (IR, PUP, NFI), snap counts. |
-| `backfill.py` | Builds the database. Run again after any Sunday to pull in results. |
-| `queries.py` | Every number the screens display comes from here: `team_metrics()`, `matchup_table()`, `ats_angles()`, `recent_games()`, `availability()`, `model_lines()`, `model_backtest()`, `luck_table()`. |
-| `verify.py` | 38 checks: ATS logic, team metrics, cover margins, injury overlay, model (out-of-sample, sane constants), luck, pace. Re-run after any change. |
+| `backfill.py` | Builds the database. Run again after any Sunday to pull in results. Run with `--full` once after upgrading to this feature, so `game_injury_events` backfills for already-cached seasons. |
+| `queries.py` | Every number the screens display comes from here: `team_metrics()`, `matchup_table()`, `ats_angles()`, `recent_games()` (last-N, or `since_season=` for the full ATS chart), `game_box_score()` (a played game's real stats, for the results view), `availability()` / `hurt_last_game()`, `model_lines()`, `model_backtest()`, `luck_table()`. |
+| `verify.py` | 63 checks: ATS logic, team metrics, cover margins, injury overlay, in-game injury parsing, week-visibility rules, results-view stats, model (out-of-sample, sane constants), luck, pace. Re-run after any change. |
 | `app.py` | **Screen 1.** The board itself. `streamlit run app.py` |
 | `Run NFL Board.bat` | Double-click launcher for Windows. |
-| `export_board.py` | Builds the website snapshot: `board_data.json` + `web\NFL Board.html`. |
+| `export_board.py` | Builds the website snapshot: `board_data.json` + `web\NFL Board.html`. `determine_weeks()` / `show_next_week()` decide which weeks are upcoming vs. results. |
 | `web\board_template.html` | The website's design. The data gets inserted at `__BOARD_DATA__`. |
 | `show.py` | Command-line version of the same data, handy for spot checks. |
 | `data/nfl.db` | The database. About 2.6 MB. |
@@ -371,6 +402,16 @@ Two things exist ahead of when they're needed:
 - Run `python backfill.py --full` to force last season's play-by-play to
   download again, for example after a late nflverse stat correction.
 - The 2026 season is already in the database with opening lines for Week 1.
+- **"Hurt last game" is a heuristic, not the injury report.** It only exists
+  because the NFL's own play-by-play charting happens to write "was injured
+  during the play" / "has returned to the game" into the text of the play --
+  there's no separate free real-time injury feed. It can miss a player if the
+  charting ever uses different wording, and "did not return" is a flag to dig
+  in, not a diagnosis. The official Wednesday-Friday report is still the
+  source of truth and replaces this note automatically once it's filed.
+- `game_injury_events` only backfills for seasons `pbp.py` actually
+  re-downloads. Existing (cached) completed seasons won't have it until you
+  run `python backfill.py --full` once.
 
 ---
 

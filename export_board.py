@@ -14,18 +14,51 @@ No Python runs behind it, so it's a snapshot as of the moment you exported.
 """
 import json
 import math
+import zoneinfo
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 
 import queries
-from config import CURRENT_SEASON, PROJECT_ROOT, WIND_FLAG_MPH, RAIN_FLAG_PCT
+from config import CURRENT_SEASON, PROJECT_ROOT, WIND_FLAG_MPH, RAIN_FLAG_PCT, CHART_SINCE_SEASON
 
 THROUGH = CURRENT_SEASON - 1   # ATS splits use completed seasons only
 N_SEASONS = 3
 TEMPLATE = PROJECT_ROOT / "web" / "board_template.html"
 OUTPUT = PROJECT_ROOT / "web" / "NFL Board.html"
+
+CHICAGO = zoneinfo.ZoneInfo("America/Chicago")
+
+
+def show_next_week(now: datetime | None = None) -> bool:
+    """
+    True every day except the one Tuesday right after this week's Monday
+    Night Football ends. "Current week" already advances the moment that
+    game's result lands -- week_slate() picks the earliest week with an
+    unplayed game -- so by Wednesday "current" is already the week whose
+    games haven't kicked off yet. This decides whether to ALSO show the
+    week after that one, so bettors can see next week's slate as soon as
+    it's a few days out, not just once it's already the current week.
+    """
+    now = now or datetime.now(CHICAGO)
+    return now.weekday() != 1   # Monday=0, Tuesday=1, ... Sunday=6
+
+
+def determine_weeks(conn, season: int, now: datetime | None = None) -> tuple[int, list[int], list[int]]:
+    """Returns (current_week, upcoming_weeks, completed_weeks)."""
+    current = int(queries.week_slate(season, None, conn=conn).iloc[0]["week"])
+    upcoming = [current]
+    if show_next_week(now):
+        nxt = current + 1
+        exists = conn.execute(
+            "SELECT COUNT(*) AS n FROM games WHERE season = ? AND week = ?",
+            (season, nxt),
+        ).fetchone()["n"]
+        if exists:
+            upcoming.append(nxt)
+    completed = list(range(1, current))   # current is the earliest incomplete week, so 1..current-1 are all done
+    return current, upcoming, completed
 
 
 def num(x):
@@ -105,6 +138,14 @@ def availability_payload(av: dict) -> dict:
         return [] if df.empty else [
             {c: (share(r[c]) if c == "snap_share" else text(r[c])) for c in cols}
             for r in df.to_dict("records")]
+    hurt_last = av.get("hurt_last_game")
+    hurt_last_game = [] if hurt_last is None or hurt_last.empty else [
+        {"name": text(r["player_name"]), "pos": text(r["position"]),
+         "returned": bool(r["returned"]), "opp": text(r["opponent"])}
+        for r in hurt_last.to_dict("records")
+    ]
+    hurt_last_game_date = None if hurt_last is None or hurt_last.empty else text(hurt_last.iloc[0]["gameday"])
+
     return {
         "week": av["week"], "report_week": av["report_week"],
         "current": bool(av["report_is_current"]),
@@ -113,6 +154,8 @@ def availability_payload(av: dict) -> dict:
         "reserve": plain(av["reserve"], ["player_name", "position", "list", "snap_share", "snap_basis"]),
         "other": plain(av["other_injuries"], ["player_name", "position", "status", "report_status",
                                               "injury", "practice_status", "snap_share", "snap_basis"]),
+        "hurt_last_game": hurt_last_game,
+        "hurt_last_game_date": hurt_last_game_date,
     }
 
 
@@ -150,6 +193,24 @@ def luck_payload(l: pd.DataFrame, team: str):
             "flags": [[k, t] for k, t in r["flags"]]}
 
 
+def box_payload(box: dict) -> dict:
+    return {team: {k: num(v) for k, v in stats.items()} for team, stats in box.items()}
+
+
+def results_game_payload(g, conn) -> dict:
+    """A completed game for the results view: final score and what actually
+    happened on the field. No line, no cover, no model -- Marcus asked for
+    the betting angle to stay out of the historical view."""
+    return {
+        "id": g["game_id"], "date": g["gameday"], "weekday": g["weekday"], "time": g["gametime"],
+        "away": g["away_team"], "home": g["home_team"],
+        "final": {"away": num(g["away_score"]), "home": num(g["home_score"])},
+        "box": box_payload(queries.game_box_score(g["game_id"], conn=conn)),
+        "roof": text(g["roof"]), "stadium": text(g["stadium"]),
+        "div": int(num(g["div_game"]) or 0),
+    }
+
+
 def game_payload(g) -> dict:
     played = pd.notna(g["result"])
     return {
@@ -169,12 +230,10 @@ def game_payload(g) -> dict:
 def main() -> None:
     conn = queries.connect(read_only=True)
 
-    current = int(queries.week_slate(CURRENT_SEASON, None, conn=conn).iloc[0]["week"])
-    # The week you're betting, plus last week's results for a look back.
-    week_list = [w for w in (current, current - 1) if w >= 1]
+    current, upcoming_weeks, completed_weeks = determine_weeks(conn, CURRENT_SEASON)
 
     weeks = []
-    for w in week_list:
+    for w in upcoming_weeks:
         slate = queries.week_slate(CURRENT_SEASON, w, conn=conn)
         m = queries.team_metrics(CURRENT_SEASON, w, conn=conn)   # as of that kickoff
         model = queries.model_lines(CURRENT_SEASON, w, conn=conn)
@@ -202,7 +261,8 @@ def main() -> None:
                     "angles": angles_payload(queries.ats_angles(
                         g[f"{side}_team"], g[("home" if side == "away" else "away") + "_team"],
                         side, g["gameday"], conn=conn)),
-                    "recent": recent_payload(queries.recent_games(g[f"{side}_team"], g["gameday"], 10, conn=conn)),
+                    "recent": recent_payload(queries.recent_games(
+                        g[f"{side}_team"], g["gameday"], since_season=CHART_SINCE_SEASON, conn=conn)),
                 } for side in ("away", "home")
             }
             games.append(gp)
@@ -214,6 +274,16 @@ def main() -> None:
                      for t in m.index} if not m.empty else {},
             "avail": {t: availability_payload(queries.availability(t, CURRENT_SEASON, w, conn=conn))
                       for t in set(slate["home_team"]) | set(slate["away_team"])},
+        })
+
+    # Every completed week gets a lighter results view: final score and real
+    # game stats, no ATS/model/trends -- see results_game_payload().
+    results_weeks = []
+    for w in completed_weeks:
+        slate = queries.week_slate(CURRENT_SEASON, w, conn=conn)
+        results_weeks.append({
+            "week": w,
+            "games": [results_game_payload(g, conn) for _, g in slate.iterrows()],
         })
 
     # Game-page extras for every team on an exported slate: game logs for this
@@ -264,6 +334,8 @@ def main() -> None:
             "defense": [[k, label, hb] for k, label, _f, hb in queries.DEFENSE],
         },
         "weeks": weeks,
+        "results_weeks": results_weeks,
+        "chart_since_season": CHART_SINCE_SEASON,
         "teams": teams,
         "teamx": teamx,
         "latest_metrics": metrics_payload(latest, CURRENT_SEASON) if not latest.empty else {},
@@ -296,8 +368,8 @@ def main() -> None:
     else:
         where = ""
 
-    print(f"Wrote board_data.json{where} — {CURRENT_SEASON} weeks {week_list}, "
-          f"{len(teams)} teams, {len(blob) // 1024} KB")
+    print(f"Wrote board_data.json{where} — {CURRENT_SEASON} upcoming weeks {upcoming_weeks}, "
+          f"results for weeks {completed_weeks or 'none yet'}, {len(teams)} teams, {len(blob) // 1024} KB")
 
 
 if __name__ == "__main__":

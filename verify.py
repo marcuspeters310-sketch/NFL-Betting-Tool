@@ -385,6 +385,103 @@ check("weather: domes are skipped, retractable roofs and open stadiums are not",
       roof_type("DET", "Home", None, None) == "dome" and roof_type("ATL", "Home", None, None) == "retractable"
       and roof_type("BUF", "Home", None, "outdoors") == "open" and roof_type("BUF", "Home", None, "closed") == "dome")
 
+# ---------------------------------------------------------------------------
+# Week visibility: current week, next week (from Wednesday on, never on the
+# Tuesday right after MNF), and the completed-weeks list for results.
+# ---------------------------------------------------------------------------
+from datetime import datetime as _dt
+from export_board import show_next_week, determine_weeks
+
+by_weekday = {_dt(2026, 9, d).strftime("%A"): _dt(2026, 9, d) for d in range(14, 21)}   # Mon 14 - Sun 20
+check("next week hides only on Tuesday, shows every other day",
+      not show_next_week(by_weekday["Tuesday"])
+      and all(show_next_week(by_weekday[d]) for d in by_weekday if d != "Tuesday"),
+      {d: show_next_week(dt) for d, dt in by_weekday.items()})
+
+current, upcoming, completed = determine_weeks(conn, CURRENT_SEASON, now=by_weekday["Wednesday"])
+check("on a Wednesday, upcoming weeks include the one after current (if scheduled)",
+      upcoming == [current, current + 1] or upcoming == [current],
+      f"current={current} upcoming={upcoming}")
+_, upcoming_tue, _ = determine_weeks(conn, CURRENT_SEASON, now=by_weekday["Tuesday"])
+check("on a Tuesday, only the current week is upcoming", upcoming_tue == [current], f"{upcoming_tue}")
+check("completed weeks are exactly 1..current-1, all fully played",
+      completed == list(range(1, current)), f"current={current} completed={completed}")
+if completed:
+    r = conn.execute(
+        "SELECT COUNT(*) AS n FROM games WHERE season = ? AND week IN ({}) AND result IS NULL".format(
+            ",".join("?" * len(completed))),
+        [CURRENT_SEASON, *completed],
+    ).fetchone()
+    check("every 'completed' week has zero unplayed games", r["n"] == 0, f"{r['n']} unplayed")
+
+# ---------------------------------------------------------------------------
+# Results view: real per-game stats, not blended/ranked, and no betting angle
+# ---------------------------------------------------------------------------
+sample_game = conn.execute(
+    "SELECT game_id FROM games WHERE season = ? AND result IS NOT NULL "
+    "AND game_id IN (SELECT game_id FROM team_game_stats) LIMIT 1", (CURRENT_SEASON,)
+).fetchone()
+if sample_game:
+    box = queries.game_box_score(sample_game["game_id"], conn=conn)
+    ok = len(box) == 2 and all(
+        (-2 <= v["epa"] <= 2) and (0 <= v["success"] <= 1) and (0 <= v["explosive_rate"] <= 1)
+        for v in box.values() if v["epa"] is not None
+    )
+    check("game_box_score returns two teams with plausible rate stats", ok, box)
+else:
+    check("game_box_score returns two teams with plausible rate stats", True, "no played+PBP game to sample yet")
+
+# ---------------------------------------------------------------------------
+# In-game injury parsing: the pbp "desc" text -> game_injury_events
+# ---------------------------------------------------------------------------
+import pandas as _pd
+from sources.pbp import parse_injuries, HURT_RE, RETURN_RE
+
+sample_pbp = _pd.DataFrame([
+    ("G1", 2099, 1, "REG", 10, "ARI-50-C.Simon was injured during the play. ARI-32-J.Blount was injured during the play."),
+    ("G1", 2099, 1, "REG", 30, "NO-12-C.Olave was injured during the play."),
+    ("G1", 2099, 1, "REG", 40, "** Injury Update: NO-12-C.Olave has returned to the game."),
+    ("G1", 2099, 1, "REG", 50, "NO-12-C.Olave was injured during the play."),   # hurt again, no return after
+], columns=["game_id", "season", "week", "season_type", "play_id", "desc"])
+parsed = parse_injuries(sample_pbp).set_index(["team", "jersey"])
+check("hurt-during-the-play regex catches every mention in a multi-injury play",
+      {("ARI", 50), ("ARI", 32), ("NO", 12)} == set(parsed.index), str(parsed.index.tolist()))
+check("a player hurt again after returning is scored on their LAST exit, not their first",
+      parsed.loc[("NO", 12), "hurt_play_id"] == 50 and parsed.loc[("NO", 12), "returned"] == 0,
+      str(parsed.loc[("NO", 12)].to_dict()))
+check("a player who never shows a return line is marked not-returned",
+      parsed.loc[("ARI", 50), "returned"] == 0 and parsed.loc[("ARI", 32), "returned"] == 0)
+check("HURT_RE / RETURN_RE don't cross-match each other's phrasing",
+      not HURT_RE.search("Injury Update: ARI-50-C.Simon has returned to the game.")
+      and not RETURN_RE.search("ARI-50-C.Simon was injured during the play."))
+
+r = conn.execute("SELECT COUNT(*) AS n FROM game_injury_events WHERE returned NOT IN (0, 1)").fetchone()
+check("game_injury_events.returned is always 0 or 1", r["n"] == 0, f"{r['n']} bad rows")
+r = conn.execute("""
+    SELECT COUNT(*) AS n FROM game_injury_events e
+    LEFT JOIN games g ON g.game_id = e.game_id
+    WHERE g.game_id IS NULL OR e.team NOT IN (g.home_team, g.away_team)
+""").fetchone()
+check("every injury event's team actually played in that game_id", r["n"] == 0, f"{r['n']} orphaned/mismatched rows")
+
+# ---------------------------------------------------------------------------
+# The ATS chart's "since" window: uncapped, still oldest-first for the caller
+# to reverse, and only as far back as it should go.
+# ---------------------------------------------------------------------------
+from config import CHART_SINCE_SEASON
+
+any_team = conn.execute("SELECT DISTINCT team FROM team_game_stats WHERE season = ? LIMIT 1",
+                        (CURRENT_SEASON,)).fetchone()
+if any_team:
+    since = queries.recent_games(any_team["team"], since_season=CHART_SINCE_SEASON, conn=conn)
+    capped = queries.recent_games(any_team["team"], n=3, conn=conn)
+    check("since_season mode is oldest-first and never older than the requested season",
+          since.empty or (since["season"].min() >= CHART_SINCE_SEASON
+                          and list(since["gameday"]) == sorted(since["gameday"])),
+          f"{len(since)} games, seasons {sorted(since['season'].unique()) if len(since) else []}")
+    check("plain n= mode is unaffected by adding since_season (still capped, still oldest-first)",
+          len(capped) <= 3 and (capped.empty or list(capped["gameday"]) == sorted(capped["gameday"])))
+
 conn.close()
 
 # ---------------------------------------------------------------------------

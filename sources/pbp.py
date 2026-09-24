@@ -19,6 +19,7 @@ flow in.
 from __future__ import annotations
 
 import io
+import re
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -34,8 +35,19 @@ USECOLS = [
     "interception", "fumble_lost", "sack", "two_point_attempt",
     "fixed_drive", "fixed_drive_result",
     "wp", "half_seconds_remaining", "game_seconds_remaining", "down", "fumble",
-    "play_id",
+    "play_id", "desc",
 ]
+
+# The NFL's official gamebook charting writes exactly these two phrases into
+# the play-by-play "desc" text -- confirmed by sampling real 2025 data. No
+# other wording has ever been seen for either event.
+#   "ARI-50-C.Simon was injured during the play."
+#   "** Injury Update: ARI-25-Z.Collins has returned to the game."
+HURT_RE = re.compile(r"([A-Z]{2,3})-(\d{1,2})-([A-Za-z][A-Za-z.'\-]*)\s+was injured during the play")
+RETURN_RE = re.compile(r"Injury Update:\s*([A-Z]{2,3})-(\d{1,2})-([A-Za-z][A-Za-z.'\-]*)\s+has returned to the game")
+
+INJURY_COLUMNS = ["game_id", "season", "week", "season_type", "team", "jersey",
+                   "short_name", "hurt_play_id", "returned"]
 
 STAT_COLUMNS = [
     "game_id", "team", "opponent", "season", "week", "season_type",
@@ -157,6 +169,45 @@ def summarize(pbp: pd.DataFrame) -> pd.DataFrame:
     return g[STAT_COLUMNS]
 
 
+def parse_injuries(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Every "was injured during the play" mention, one row per (game, team,
+    jersey): the play_id of their LAST such mention that game, and whether a
+    later "has returned to the game" line followed it. Empty frame (right
+    columns, no rows) if the season has none -- rare, but a slow week happens.
+    """
+    sub = pbp[["game_id", "season", "week", "season_type", "play_id", "desc"]].dropna(subset=["desc"])
+
+    hurt_rows, return_rows = [], []
+    for game_id, season, week, season_type, play_id, desc in sub.itertuples(index=False, name=None):
+        for team, jersey, name in HURT_RE.findall(desc):
+            hurt_rows.append((game_id, season, week, season_type, team, int(jersey), name, play_id))
+        for team, jersey, name in RETURN_RE.findall(desc):
+            return_rows.append((game_id, team, int(jersey), play_id))
+
+    if not hurt_rows:
+        return pd.DataFrame(columns=INJURY_COLUMNS)
+
+    hurt = pd.DataFrame(hurt_rows, columns=["game_id", "season", "week", "season_type",
+                                             "team", "jersey", "short_name", "play_id"])
+    # A player can go down more than once; keep only their last exit that game.
+    hurt = (hurt.sort_values("play_id")
+                .groupby(["game_id", "team", "jersey"], as_index=False).last()
+                .rename(columns={"play_id": "hurt_play_id"}))
+
+    ret = pd.DataFrame(return_rows, columns=["game_id", "team", "jersey", "play_id"])
+
+    def came_back(row) -> int:
+        if ret.empty:
+            return 0
+        m = ret[(ret["game_id"] == row["game_id"]) & (ret["team"] == row["team"])
+                & (ret["jersey"] == row["jersey"]) & (ret["play_id"] > row["hurt_play_id"])]
+        return int(len(m) > 0)
+
+    hurt["returned"] = hurt.apply(came_back, axis=1)
+    return hurt[INJURY_COLUMNS]
+
+
 def season_loaded(conn, season: int) -> bool:
     """True if the season is loaded with every current column filled in.
     Rows from before a column was added count as not loaded, so they refresh."""
@@ -170,10 +221,17 @@ def season_loaded(conn, season: int) -> bool:
 def load_season(conn, season: int) -> int:
     """Replace one season's rows. Delete + insert in one transaction, so a
     failed download never leaves a half-loaded season behind."""
-    stats = summarize(download_pbp(season))
+    pbp = download_pbp(season)
+    stats = summarize(pbp)
+    injuries = parse_injuries(pbp)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
     cols = STAT_COLUMNS + ["updated_at"]
     rows = [tuple(r) + (now,) for r in stats.astype(object).itertuples(index=False, name=None)]
+
+    icols = INJURY_COLUMNS + ["updated_at"]
+    irows = [tuple(r) + (now,) for r in injuries.astype(object).itertuples(index=False, name=None)]
+
     with conn:
         conn.execute("DELETE FROM team_game_stats WHERE season = ?", (season,))
         conn.executemany(
@@ -181,6 +239,13 @@ def load_season(conn, season: int) -> int:
             f"VALUES ({', '.join('?' for _ in cols)})",
             rows,
         )
+        conn.execute("DELETE FROM game_injury_events WHERE season = ?", (season,))
+        if irows:
+            conn.executemany(
+                f"INSERT INTO game_injury_events ({', '.join(icols)}) "
+                f"VALUES ({', '.join('?' for _ in icols)})",
+                irows,
+            )
     return len(rows)
 
 

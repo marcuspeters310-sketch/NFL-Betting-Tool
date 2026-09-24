@@ -251,6 +251,35 @@ CREATE TABLE IF NOT EXISTS line_snapshots (
 CREATE INDEX IF NOT EXISTS idx_snap_game ON line_snapshots(game_id, market, captured_at);
 
 -- ---------------------------------------------------------------------------
+-- game_injury_events: in-game injuries parsed from the play-by-play text.
+-- nflverse's official injury report only exists Wed-Fri, so from the end of
+-- a game until then, this is the only free signal that a player got hurt.
+-- The NFL's own gamebook charting writes two exact phrases into the "desc"
+-- column of every play: "TEAM-##-Name was injured during the play." and,
+-- later in the same game if they came back, "** Injury Update: TEAM-##-Name
+-- has returned to the game." sources/pbp.py regexes those out of the same
+-- play-by-play download already used for team_game_stats -- no extra fetch.
+-- One row per player per game: their LAST injury mention that game, and
+-- whether a later return line followed it. No return line is the strongest
+-- signal (players who returned mid-game usually aren't hurt badly enough to
+-- change next week's report; one who never shows a return line might be).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS game_injury_events (
+    game_id       TEXT NOT NULL,
+    season        INTEGER NOT NULL,
+    week          INTEGER NOT NULL,
+    season_type   TEXT,
+    team          TEXT NOT NULL,      -- 3-letter code as written in the play text
+    jersey        INTEGER NOT NULL,
+    short_name    TEXT,               -- e.g. "C.Simon", as charted -- not a full roster name
+    hurt_play_id  INTEGER,            -- play_id of their last "was injured" mention
+    returned      INTEGER,            -- 1 if a later "has returned to the game" followed
+    updated_at    TEXT,
+    PRIMARY KEY (game_id, team, jersey)
+);
+CREATE INDEX IF NOT EXISTS idx_gie_team_week ON game_injury_events(team, season, week);
+
+-- ---------------------------------------------------------------------------
 -- weather_forecasts: the latest kickoff-hour forecast for upcoming outdoor
 -- (and retractable-roof) games, from Open-Meteo (free, no key). One row per
 -- game, replaced on every refresh. Indoor games get no row.

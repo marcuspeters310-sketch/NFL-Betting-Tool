@@ -647,16 +647,79 @@ def ats_angles(team: str, opponent: Optional[str] = None, side: Optional[str] = 
     return pd.DataFrame(rows)
 
 
-def recent_games(team: str, before: Optional[str] = None, n: int = 10, conn=None) -> pd.DataFrame:
-    """Last n games with the line and how far they beat or missed it. Oldest first."""
+def recent_games(team: str, before: Optional[str] = None, n: int = 10,
+                  since_season: Optional[int] = None, conn=None) -> pd.DataFrame:
+    """
+    Games with the line and how far they beat or missed it. Oldest first.
+
+    Default: the last n games. Pass since_season instead to get every game
+    from that season through `before`, uncapped -- used for the full ATS
+    chart, which wants the whole history rather than a fixed window.
+    """
     close = conn is None
     conn = conn or connect(read_only=True)
-    df = _team_games(conn, team, before).head(n).iloc[::-1].reset_index(drop=True)
+    all_games = _team_games(conn, team, before, since_season if since_season is not None else 1999)
+    df = all_games if since_season is not None else all_games.head(n)
+    df = df.iloc[::-1].reset_index(drop=True)
     if close:
         conn.close()
     return df[["gameday", "season", "week", "game_type", "opponent", "side",
                "points_for", "points_against", "margin", "team_spread",
                "ats_margin", "ats", "total", "total_line", "ou_result"]]
+
+
+GAME_STATS = [
+    ("epa",            "EPA / play",        "{:+.3f}"),
+    ("pass_epa",       "Pass EPA / play",   "{:+.3f}"),
+    ("rush_epa",       "Rush EPA / play",   "{:+.3f}"),
+    ("success",        "Success rate",      "{:.1%}"),
+    ("yards",          "Yards",             "{:.0f}"),
+    ("third_pct",      "3rd down %",        "{:.1%}"),
+    ("rz_pct",         "Red zone TD %",     "{:.1%}"),
+    ("giveaways",      "Giveaways",         "{:.0f}"),
+    ("sacks_taken",    "Sacks taken",       "{:.0f}"),
+    ("explosive_rate", "Explosive play %",  "{:.1%}"),
+]
+
+
+def game_box_score(game_id: str, conn=None) -> dict:
+    """
+    What actually happened in ONE played game -- real per-team numbers from
+    team_game_stats, not the blended/ranked season metrics and not any
+    betting angle. This is what a completed week's results view shows
+    instead of ATS records: {team: {stat_key: value_or_None}}. Empty dict if
+    play-by-play wasn't loaded for this game (very old seasons).
+    """
+    close = conn is None
+    conn = conn or connect(read_only=True)
+    df = pd.read_sql_query("SELECT * FROM team_game_stats WHERE game_id = ?", conn, params=[game_id])
+    if close:
+        conn.close()
+    if df.empty:
+        return {}
+
+    def rate(numer, denom):
+        return None if not denom else float(numer) / float(denom)
+
+    def plain(v):
+        return None if pd.isna(v) else float(v)
+
+    out = {}
+    for _, r in df.iterrows():
+        plays = r["plays"] or 0
+        out[r["team"]] = {
+            "epa": rate(r["epa_sum"], plays),
+            "pass_epa": rate(r["pass_epa_sum"], r["pass_plays"]),
+            "rush_epa": rate(r["rush_epa_sum"], r["rush_plays"]),
+            "success": rate(r["successes"], plays),
+            "yards": plain(r["yards"]),
+            "third_pct": rate(r["third_conv"], r["third_att"]),
+            "rz_pct": rate(r["rz_tds"], r["rz_drives"]),
+            "giveaways": plain(r["giveaways"]),
+            "sacks_taken": plain(r["sacks_taken"]),
+            "explosive_rate": rate(r["explosives"], plays),
+        }
+    return out
 
 
 # ===========================================================================
@@ -716,6 +779,65 @@ def _snap_shares(conn, season: int) -> pd.DataFrame:
                MAX(CASE WHEN season = ? THEN games END) AS games_prior
         FROM per GROUP BY gsis_id
     """, conn, params=[season, season - 1, season, season, season - 1, season - 1]).set_index("gsis_id")
+
+
+def hurt_last_game(team: str, season: int = CURRENT_SEASON, before_week: Optional[int] = None,
+                    conn=None) -> pd.DataFrame:
+    """
+    Players the play-by-play flagged as injured in TEAM's most recently
+    completed game (the last one before before_week, skipping past any bye).
+
+    This is the only free, real-time-ish signal for an injury before the
+    official report is filed Wednesday-Friday -- it comes from parsing
+    "was injured during the play" / "has returned to the game" out of the
+    play-by-play text (see game_injury_events / sources/pbp.py). It only
+    knows what happened ON the field: nothing about a Monday MRI, a setback
+    at Wednesday's practice, or anything a beat reporter finds out later.
+    Treat "returned" as reassuring and "did not return" as a real flag, not
+    a diagnosis.
+
+    Columns: player_name, position, jersey, returned (0/1), opponent, gameday, week.
+    """
+    close = conn is None
+    conn = conn or connect(read_only=True)
+    row = conn.execute("""
+        SELECT game_id, week, gameday,
+               CASE WHEN home_team = ? THEN away_team ELSE home_team END AS opponent
+        FROM games
+        WHERE season = ? AND (home_team = ? OR away_team = ?) AND result IS NOT NULL
+          AND (? IS NULL OR week <= ?)
+        ORDER BY gameday DESC LIMIT 1
+    """, (team, season, team, team, before_week, before_week)).fetchone()
+
+    cols = ["player_name", "position", "jersey", "returned", "opponent", "gameday", "week"]
+    if row is None:
+        if close:
+            conn.close()
+        return pd.DataFrame(columns=cols)
+
+    ev = pd.read_sql_query("""
+        SELECT jersey, short_name, returned FROM game_injury_events
+        WHERE game_id = ? AND team = ?
+    """, conn, params=[row["game_id"], team])
+    if ev.empty:
+        if close:
+            conn.close()
+        return pd.DataFrame(columns=cols)
+
+    names = pd.read_sql_query("""
+        SELECT jersey, full_name, position FROM roster_status
+        WHERE season = ? AND team = ? AND week = ?
+    """, conn, params=[season, team, row["week"]])
+    if close:
+        conn.close()
+
+    ev = ev.merge(names, on="jersey", how="left")
+    ev["player_name"] = ev["full_name"].where(ev["full_name"].notna(), ev["short_name"])
+    ev["opponent"] = row["opponent"]
+    ev["gameday"] = row["gameday"]
+    ev["week"] = row["week"]
+    ev = ev.sort_values(["returned", "jersey"]).reset_index(drop=True)
+    return ev[cols]
 
 
 def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = None,
@@ -854,12 +976,16 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
         other_injuries = other_injuries[other_injuries["status"] != "active"]
         other_injuries = other_injuries.sort_values("snap_share", ascending=False, na_position="last").reset_index(drop=True)
 
+    hurt_last = hurt_last_game(team, season, week - 1, conn=None) if close else \
+        hurt_last_game(team, season, week - 1, conn=conn)
+
     return {
         "week": week,
         "report_week": rep_week,
         "report_is_current": rep_week == week,
         "snapshot_at": depth["snapshot_at"].max() if len(depth) else None,
         "depth": dc, "reserve": reserve, "other_injuries": other_injuries,
+        "hurt_last_game": hurt_last,
     }
 
 

@@ -170,6 +170,14 @@ details.more[open] summary{margin-bottom:10px}
 .share .track{height:6px;border-radius:3px;background:var(--sunk);position:relative;min-width:60px}
 .share .track b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ink);opacity:.55}
 .notice{font-size:12.5px;background:color-mix(in srgb,var(--chalk) 16%,var(--surface));border:1px solid color-mix(in srgb,var(--chalk) 50%,var(--line));border-radius:6px;padding:6px 9px}
+.notice.hlg{margin-top:8px;display:grid;gap:6px}
+.hlg-list{display:grid;gap:4px}
+.hlg-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;background:var(--surface);border-radius:6px;padding:5px 8px}
+.hlg-row .who{font-weight:600}
+.hlg-row .role{font-size:11px;color:var(--muted)}
+.hlg-row .hlg-tag{margin-left:auto;font-size:11px;font-weight:600}
+.hlg-row.out .hlg-tag{color:var(--bad-strong)}
+.hlg-row.back .hlg-tag{color:var(--good)}
 /* ---- trends chart ---- */
 .chart{position:relative}
 .chart svg{display:block;width:100%;height:auto;overflow:visible}
@@ -203,6 +211,16 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 @media (min-width:820px){.tiles-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (min-width:1180px){.wrap{max-width:1180px}.tiles-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .gtile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0;scroll-margin-top:70px}
+.gtile.is-condensed{gap:8px;padding:10px 12px}
+.cond-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cond-spread{font-size:13px;font-weight:600;white-space:nowrap}
+.cond-stats{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted);flex:1 1 auto;min-width:0}
+.cond-row{display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+.cond-row .cond-k{text-transform:uppercase;letter-spacing:.04em;font-size:10px;min-width:38px}
+.cond-row .num{color:var(--ink);font-size:12px}
+.cond-mid{color:var(--muted)}
+.expand-btn{margin-left:auto;border:1px solid var(--line);background:var(--sunk);border-radius:7px;padding:5px 9px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.expand-btn:hover{color:var(--ink)}
 .ghead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:inherit;text-decoration:none}
 .gteams{font:700 26px/1 var(--display);text-transform:uppercase}
 .gteams .at,.ghero h2 .at{color:var(--muted);font-size:.75em;margin:0 5px}
@@ -363,10 +381,13 @@ const state = {
   tabs: {},
   modelOpen: false,
   tileView: {},
+  tileExpanded: new Set(),
   gameTeam: null,
   depthSel: null,
 };
-if (!D.weeks.some(w => w.week === state.week)) state.week = D.current_week;
+const isResultsWeek = w => (D.results_weeks || []).some(x => x.week === w);
+const allWeekNums = () => [...D.weeks.map(w => w.week), ...(D.results_weeks || []).map(w => w.week)];
+if (!allWeekNums().includes(state.week)) state.week = D.current_week;
 if (!D.teams[state.team]) state.team = Object.keys(D.teams)[0];
 
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -448,6 +469,17 @@ function card(p){
     ${p.rp ? `<div class="det">Next man up: <b>${esc(p.rp)}</b></div>${shareBar(p.rsh, "His snaps")}` : ""}
   </div>`;
 }
+function hurtLastGameBlock(av){
+  if (av.current || !av.hurt_last_game?.length) return "";
+  const rows = av.hurt_last_game.map(p => `<div class="hlg-row ${p.returned ? "back" : "out"}">
+      <span class="who">${esc(p.name)}</span><span class="role">${esc(p.pos)}</span>
+      <span class="hlg-tag">${p.returned ? "Returned to that game" : "Did not return"}</span>
+    </div>`).join("");
+  return `<div class="notice hlg">
+    <b>Hurt last game</b> (vs ${esc(av.hurt_last_game[0].opp)}) -- this week's official injury report isn't out yet, so this is from the play-by-play, not a diagnosis.
+    <div class="hlg-list">${rows}</div>
+  </div>`;
+}
 function availabilityPanel(t){
   const av = currentWeek().avail?.[t] || D.teams[t]?.avail;
   if (!av) return `<p class="meta">No depth chart loaded for ${t}.</p>`;
@@ -464,6 +496,7 @@ function availabilityPanel(t){
       </tbody></table></div></details>` : "");
   return `<div class="block"><h4>${t} ${NAMES[t] || ""}</h4>
     <p class="notice">${esc(note)} Depth chart as of ${esc(av.snapshot)}.</p>
+    ${hurtLastGameBlock(av)}
     <h3 class="sec-h" style="margin-top:10px">Not fully available</h3>${hurtCards(av, false)}
     ${extra}
     <div class="pair" style="margin-top:12px"><div><h3 class="sec-h">Offense</h3>${depthBoard(av, "O")}</div><div><h3 class="sec-h">Defense</h3>${depthBoard(av, "D")}</div></div>
@@ -795,25 +828,108 @@ function finalStrip(g){
   return `<div class="final"><span class="num"><b>Final</b> ${g.away} ${f.away} – ${f.home} ${g.home}</span><span>${[cov, ou].filter(Boolean).join(" · ")}</span></div>`;
 }
 
+function condStat(rec){
+  return `<span class="num">${esc(rec ?? "–")}</span>`;
+}
+function condensedStrip(g){
+  // Last-3-games ATS and O/U records for both teams -- enough to scan a
+  // slate quickly. windowRows()[1] is "Last 3 games" (index 0 is the
+  // season-to-date row); see ENTRIES above.
+  const ats3 = windowRows(g, "ats")[1], ou3 = windowRows(g, "ou")[1];
+  return `<div class="cond-stats">
+    <div class="cond-row"><span class="cond-k">ATS L3</span>${condStat(ats3?.a?.rec)}<span class="cond-mid">·</span>${condStat(ats3?.h?.rec)}</div>
+    <div class="cond-row"><span class="cond-k">O/U L3</span>${condStat(ou3?.a?.rec)}<span class="cond-mid">·</span>${condStat(ou3?.h?.rec)}</div>
+  </div>`;
+}
+
 function gameTile(g){
   const view = state.tileView[g.id] || "spread";
+  const expanded = state.tileExpanded.has(g.id);
   const when = `${(g.weekday || "").slice(0, 3)} ${fmtKick(g.time)} ET`;
-  return `<article class="gtile" id="g-${g.id}">
+  return `<article class="gtile ${expanded ? "" : "is-condensed"}" id="g-${g.id}">
     <a class="ghead" href="#game=${g.id}">
       <span class="gteams">${g.away}<span class="at">@</span>${g.home}</span>
       <span class="gmeta"><span>${esc(when)}</span><span class="more-link">Details ›</span></span>
     </a>
+    <div class="cond-line">
+      <span class="cond-spread num">${esc(spreadText(g))}</span>
+      ${condensedStrip(g)}
+      <button type="button" class="expand-btn" data-expand="${g.id}" aria-expanded="${expanded}">${expanded ? "Less ▲" : "More ▼"}</button>
+    </div>
+    ${expanded ? `
     <div class="sw" role="group" aria-label="Summary for ${g.away} at ${g.home}">
       <button type="button" data-tile="${g.id}" data-v="spread" aria-pressed="${view === "spread"}">Spread <span class="num">${esc(spreadText(g))}</span></button>
       <button type="button" data-tile="${g.id}" data-v="ou" aria-pressed="${view === "ou"}">Over/Under <span class="num">${g.total ?? "–"}</span></button>
     </div>
     ${finalStrip(g)}
     ${weatherStrip(g, false)}
-    <div class="mt">${tileBody(g, view)}</div>
+    <div class="mt">${tileBody(g, view)}</div>` : ""}
   </article>`;
 }
 
+function weekBar(selected){
+  const items = [
+    ...D.weeks.map(w => ({week: w.week, label: w.week === D.current_week ? "upcoming" : "next week"})),
+    ...(D.results_weeks || []).map(w => ({week: w.week, label: "results"})),
+  ].sort((a, b) => b.week - a.week);
+  return `<div class="seg" role="group" aria-label="Week">
+    ${items.map(x => `<button type="button" id="wk-${x.week}" data-week="${x.week}" aria-pressed="${x.week === selected}">Week ${x.week} · ${x.label}</button>`).join("")}
+  </div>`;
+}
+
+const BOX_STATS = [
+  ["epa", "EPA / play", v => sgn(v, 3)],
+  ["pass_epa", "Pass EPA / play", v => sgn(v, 3)],
+  ["rush_epa", "Rush EPA / play", v => sgn(v, 3)],
+  ["success", "Success rate", v => pct1(v)],
+  ["yards", "Yards", v => v == null ? "–" : String(Math.round(v))],
+  ["third_pct", "3rd down %", v => pct1(v)],
+  ["rz_pct", "Red zone TD %", v => pct1(v)],
+  ["giveaways", "Giveaways", v => v == null ? "–" : String(Math.round(v))],
+  ["sacks_taken", "Sacks taken", v => v == null ? "–" : String(Math.round(v))],
+  ["explosive_rate", "Explosive play %", v => pct1(v)],
+];
+const pct1 = v => v == null ? "–" : `${Math.round(v * 100)}%`;
+
+function resultTile(g){
+  const box = g.box || {};
+  const boxAway = box[g.away], boxHome = box[g.home];
+  const rows = (boxAway && boxHome) ? BOX_STATS.map(([k, label, fmt]) => `<div class="mrow">
+      <span class="c l num">${fmt(boxAway[k])}</span>
+      <span class="mid"><span>${label}</span></span>
+      <span class="c r num">${fmt(boxHome[k])}</span>
+    </div>`).join("") : "";
+  return `<article class="gtile is-result">
+    <div class="ghead">
+      <span class="gteams">${g.away}<span class="at">@</span>${g.home}</span>
+      <span class="gmeta"><span>${(g.weekday || "").slice(0, 3)} ${esc(g.date.slice(5))}</span></span>
+    </div>
+    <div class="final"><span class="num"><b>Final</b> ${g.away} ${g.final.away} – ${g.final.home} ${g.home}</span>${g.stadium ? `<span>${esc(g.stadium)}</span>` : ""}</div>
+    ${rows ? `<div class="mt"><div class="mhead"><span><b>${g.away}</b></span><span></span><span><b>${g.home}</b></span></div>${rows}</div>`
+      : `<p class="meta" style="margin:0">Play-by-play stats aren't loaded for this game.</p>`}
+  </article>`;
+}
+
+function renderResultsWeek(week){
+  const W = D.results_weeks.find(w => w.week === week);
+  const byDay = [];
+  for (const g of W.games){
+    const last = byDay[byDay.length - 1];
+    if (last && last.date === g.date) last.games.push(g); else byDay.push({date: g.date, weekday: g.weekday, games: [g]});
+  }
+  app.innerHTML = `
+    <div class="weekbar">
+      <h2>Week ${W.week}</h2>
+      ${weekBar(week)}
+      <span class="sub">${W.games.length} games · final</span>
+    </div>
+    <p class="meta" style="margin:0 0 14px;max-width:70ch">Final scores and what actually happened on the field: EPA per play, success rate, yards, red zone and third-down rates, turnovers and sacks. No lines, covers or records here -- see This week for the current slate.</p>
+    ${byDay.map(d => `<section class="day"><h3>${fmtDate(d.date, d.weekday)}</h3><div class="tiles-grid">${d.games.map(resultTile).join("")}</div></section>`).join("")}
+  `;
+}
+
 function renderWeek(){
+  if (isResultsWeek(state.week)){ renderResultsWeek(state.week); return; }
   const W = currentWeek();
   const route = parseRoute();
   if (route.game){
@@ -834,9 +950,7 @@ function renderWeek(){
   app.innerHTML = `
     <div class="weekbar">
       <h2>Week ${W.week}</h2>
-      <div class="seg" role="group" aria-label="Week">
-        ${D.weeks.slice().sort((a,b)=>b.week-a.week).map(w => `<button type="button" id="wk-${w.week}" data-week="${w.week}" aria-pressed="${w.week === W.week}">Week ${w.week}${w.week === D.current_week ? " · upcoming" : " · results"}</button>`).join("")}
-      </div>
+      ${weekBar(W.week)}
       <span class="sub">${W.games.length} games · ${played} played</span>
     </div>
     <details class="guide" id="guide"><summary>How to read this board</summary><div>
@@ -847,6 +961,8 @@ function renderWeek(){
       <p><b>Points estimate</b> is the simple average of the two scoring rows, compared with the total. It isn't a model.</p>
       <p><b>Weather</b> is the kickoff-hour forecast from Open-Meteo, refreshed with the board. A game is flagged at ${D.weather_flags?.wind ?? 15}+ mph wind or a ${D.weather_flags?.rain ?? 50}%+ chance of rain.</p>
       <p><b>Details ›</b> opens the game page: game logs, roster and depth chart with injuries, and full ATS and O/U splits.</p>
+      <p>Tiles start condensed -- teams, kickoff, spread, and each team's last 3 games ATS and O/U. Tap <b>More ▼</b> for the full matchup breakdown.</p>
+      <p>Next week's slate joins the board from Wednesday on; the week switcher above also holds every finished week's results once its games are done.</p>
       ${anyStale ? `<p>This week's injury reports aren't all out yet (teams file Wednesday to Friday), so some hurt-starter counts use last week's report.</p>` : ""}
     </div></details>
     ${byDay.map(d => `<section class="day"><h3>${fmtDate(d.date, d.weekday)}</h3><div class="tiles-grid">${d.games.map(gameTile).join("")}</div></section>`).join("")}
@@ -972,7 +1088,7 @@ function rosterPane(t){
   const note = !av ? "" : av.report_week == null ? "No injury report has been filed yet this season."
     : av.current ? `Week ${av.report_week} injury report.`
     : `The week ${av.week} injury report isn't out yet (teams file Wednesday to Friday), so tags come from week ${av.report_week}.`;
-  return `${changesBox(t)}${depthGrid(t, "O")}${depthGrid(t, "D")}
+  return `${changesBox(t)}${av ? hurtLastGameBlock(av) : ""}${depthGrid(t, "O")}${depthGrid(t, "D")}
     <p class="meta">${note} Tags: Q questionable, D doubtful, OUT, IR injured reserve, PUP / NFI other reserve lists, RES other reserve list, LP limited practice. Depth chart snapshot ${esc(av?.snapshot || "")}.</p>`;
 }
 function splitCell(x, right){
@@ -986,15 +1102,19 @@ function splitCell(x, right){
 function barsBlock(g, kind){
   const col = side => {
     const t = g[side];
-    const rows = (g.trends?.[side]?.recent || []).map(r => ({opp: r.opp, v: kind === "ats" ? r.m : (r.tot != null && r.tl != null ? r.tot - r.tl : null)}));
-    const max = Math.max(1, ...rows.map(r => Math.abs(r.v ?? 0)));
-    return `<div class="bars"><b>${t}</b>${rows.map(r => `<div class="bar-row"><span class="num soft">${r.opp}</span>
+    const rows = (g.trends?.[side]?.recent || []).map(r => ({
+      opp: r.opp, d: r.d, v: kind === "ats" ? r.m : (r.tot != null && r.tl != null ? r.tot - r.tl : null),
+    }));
+    const ordered = rows.slice().reverse();   // most recent at top
+    const max = Math.max(1, ...ordered.map(r => Math.abs(r.v ?? 0)));
+    return `<div class="bars"><b>${t}</b>${ordered.map(r => `<div class="bar-row"><span class="num soft">${r.opp}</span>
       <span class="bar-track">${r.v == null ? "" : `<i class="${r.v > 0 ? "up" : "down"}" style="width:${(Math.abs(r.v) / max * 50).toFixed(1)}%"></i>`}</span>
       <span class="num r">${r.v == null ? "–" : sgn(r.v, 1).replace(".0", "")}</span></div>`).join("")}</div>`;
   };
-  return `<div class="card"><h4>Last 10 games · ${kind === "ats" ? "cover margin" : "points vs total"}</h4>
+  const since = D.chart_since_season ?? 2025;
+  return `<div class="card"><h4>${kind === "ats" ? "Cover margin" : "Points vs total"} since ${since}</h4>
     <div class="bars2">${col("away")}${col("home")}</div>
-    <p class="meta">Oldest at top. Blue = ${kind === "ats" ? "covered" : "over"}, orange = ${kind === "ats" ? "missed" : "under"}. Includes playoffs and last season.</p></div>`;
+    <p class="meta">Most recent at top. Blue = ${kind === "ats" ? "covered" : "over"}, orange = ${kind === "ats" ? "missed" : "under"}. Includes playoffs.</p></div>`;
 }
 function splitsPane(g, kind){
   const A = g.splits?.away || [], H = g.splits?.home || [];
@@ -1106,6 +1226,14 @@ app.addEventListener("click", e => {
     state.tileView[tv.dataset.tile] = tv.dataset.v;
     const el = document.getElementById("g-" + tv.dataset.tile);
     if (el) el.outerHTML = gameTile(findGame(tv.dataset.tile));
+    return;
+  }
+  const ex = e.target.closest("button[data-expand]");
+  if (ex){
+    const id = ex.dataset.expand;
+    if (state.tileExpanded.has(id)) state.tileExpanded.delete(id); else state.tileExpanded.add(id);
+    const el = document.getElementById("g-" + id);
+    if (el) el.outerHTML = gameTile(findGame(id));
     return;
   }
   const gt = e.target.closest("button[data-gteam]");

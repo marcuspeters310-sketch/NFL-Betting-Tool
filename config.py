@@ -63,5 +63,9 @@ PBP_SEASONS = [CURRENT_SEASON - 2, CURRENT_SEASON - 1, CURRENT_SEASON]
 # capped at 100%. At 6: one game played = 17%, three = 50%, six or more = 100%.
 BLEND_FULL_AT_GAMES = 6
 
+# The per-game ATS cover-margin chart (game page, ATS/O-U tabs) shows every
+# game from this season through today, instead of a fixed last-N window.
+CHART_SINCE_SEASON = 2025
+
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
