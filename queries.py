@@ -796,7 +796,11 @@ def hurt_last_game(team: str, season: int = CURRENT_SEASON, before_week: Optiona
     Treat "returned" as reassuring and "did not return" as a real flag, not
     a diagnosis.
 
-    Columns: player_name, position, jersey, returned (0/1), opponent, gameday, week.
+    Columns: player_name, position, jersey, returned (0/1), opponent, gameday,
+    week, qtr, game_clock, notes (that play's full charted description).
+    qtr/game_clock/notes can be None for a game whose play-by-play was loaded
+    before this column existed -- they backfill the next time that season's
+    play-by-play is re-downloaded (see sources/pbp.py).
     """
     close = conn is None
     conn = conn or connect(read_only=True)
@@ -809,14 +813,15 @@ def hurt_last_game(team: str, season: int = CURRENT_SEASON, before_week: Optiona
         ORDER BY gameday DESC LIMIT 1
     """, (team, season, team, team, before_week, before_week)).fetchone()
 
-    cols = ["player_name", "position", "jersey", "returned", "opponent", "gameday", "week"]
+    cols = ["player_name", "position", "jersey", "returned", "opponent", "gameday", "week",
+            "qtr", "game_clock", "notes"]
     if row is None:
         if close:
             conn.close()
         return pd.DataFrame(columns=cols)
 
     ev = pd.read_sql_query("""
-        SELECT jersey, short_name, returned FROM game_injury_events
+        SELECT jersey, short_name, returned, qtr, game_clock, notes FROM game_injury_events
         WHERE game_id = ? AND team = ?
     """, conn, params=[row["game_id"], team])
     if ev.empty:

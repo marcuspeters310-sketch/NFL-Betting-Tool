@@ -286,6 +286,11 @@ CREATE INDEX IF NOT EXISTS idx_snap_game ON line_snapshots(game_id, market, capt
 -- whether a later return line followed it. No return line is the strongest
 -- signal (players who returned mid-game usually aren't hurt badly enough to
 -- change next week's report; one who never shows a return line might be).
+-- qtr / game_clock / notes are read straight off that same play: notes is
+-- the play's full "desc" text, which already narrates what happened before
+-- the injury phrase ("(Shotgun) T.Tagovailoa pass short right to J.Waddle to
+-- MIA 45 for 12 yards (J.Smith). ARI-50-C.Simon was injured during the
+-- play."), so there's no second lookup for context.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS game_injury_events (
     game_id       TEXT NOT NULL,
@@ -297,6 +302,9 @@ CREATE TABLE IF NOT EXISTS game_injury_events (
     short_name    TEXT,               -- e.g. "C.Simon", as charted -- not a full roster name
     hurt_play_id  INTEGER,            -- play_id of their last "was injured" mention
     returned      INTEGER,            -- 1 if a later "has returned to the game" followed
+    qtr           INTEGER,            -- quarter of the injury play (5 = OT)
+    game_clock    TEXT,               -- game clock at that play, "MM:SS"
+    notes         TEXT,               -- that play's full charted description
     updated_at    TEXT,
     PRIMARY KEY (game_id, team, jersey)
 );
@@ -425,6 +433,9 @@ MIGRATIONS = {
         ("neutral_plays", "INTEGER"), ("neutral_passes", "INTEGER"),
         ("neutral_sec_sum", "REAL"), ("neutral_sec_n", "INTEGER"),
         ("explosives", "INTEGER"), ("fumbles", "INTEGER"), ("fumbles_lost", "INTEGER"),
+    ],
+    "game_injury_events": [
+        ("qtr", "INTEGER"), ("game_clock", "TEXT"), ("notes", "TEXT"),
     ],
 }
 

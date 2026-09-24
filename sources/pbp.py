@@ -35,7 +35,7 @@ USECOLS = [
     "interception", "fumble_lost", "sack", "two_point_attempt",
     "fixed_drive", "fixed_drive_result",
     "wp", "half_seconds_remaining", "game_seconds_remaining", "down", "fumble",
-    "play_id", "desc",
+    "play_id", "desc", "qtr", "time",
 ]
 
 # The NFL's official gamebook charting writes exactly these two phrases into
@@ -47,7 +47,7 @@ HURT_RE = re.compile(r"([A-Z]{2,3})-(\d{1,2})-([A-Za-z][A-Za-z.'\-]*)\s+was inju
 RETURN_RE = re.compile(r"Injury Update:\s*([A-Z]{2,3})-(\d{1,2})-([A-Za-z][A-Za-z.'\-]*)\s+has returned to the game")
 
 INJURY_COLUMNS = ["game_id", "season", "week", "season_type", "team", "jersey",
-                   "short_name", "hurt_play_id", "returned"]
+                   "short_name", "hurt_play_id", "returned", "qtr", "game_clock", "notes"]
 
 STAT_COLUMNS = [
     "game_id", "team", "opponent", "season", "week", "season_type",
@@ -172,25 +172,33 @@ def summarize(pbp: pd.DataFrame) -> pd.DataFrame:
 def parse_injuries(pbp: pd.DataFrame) -> pd.DataFrame:
     """
     Every "was injured during the play" mention, one row per (game, team,
-    jersey): the play_id of their LAST such mention that game, and whether a
-    later "has returned to the game" line followed it. Empty frame (right
-    columns, no rows) if the season has none -- rare, but a slow week happens.
+    jersey): the play_id of their LAST such mention that game, whether a
+    later "has returned to the game" line followed it, when in the game it
+    happened (qtr / game_clock), and the full play-by-play text of that play
+    as notes -- it already describes what happened before the injury phrase
+    ("(Shotgun) T.Tagovailoa pass short right to J.Waddle to MIA 45 for 12
+    yards (J.Smith). ARI-50-C.Simon was injured during the play."), so no
+    second lookup is needed for context. Empty frame (right columns, no
+    rows) if the season has none -- rare, but a slow week happens.
     """
-    sub = pbp[["game_id", "season", "week", "season_type", "play_id", "desc"]].dropna(subset=["desc"])
+    sub = pbp[["game_id", "season", "week", "season_type", "play_id", "desc", "qtr", "time"]].dropna(subset=["desc"])
 
     hurt_rows, return_rows = [], []
-    for game_id, season, week, season_type, play_id, desc in sub.itertuples(index=False, name=None):
+    for game_id, season, week, season_type, play_id, desc, qtr, clock in sub.itertuples(index=False, name=None):
         for team, jersey, name in HURT_RE.findall(desc):
-            hurt_rows.append((game_id, season, week, season_type, team, int(jersey), name, play_id))
+            hurt_rows.append((game_id, season, week, season_type, team, int(jersey), name, play_id,
+                              None if pd.isna(qtr) else int(qtr), clock if isinstance(clock, str) else None, desc))
         for team, jersey, name in RETURN_RE.findall(desc):
             return_rows.append((game_id, team, int(jersey), play_id))
 
     if not hurt_rows:
         return pd.DataFrame(columns=INJURY_COLUMNS)
 
-    hurt = pd.DataFrame(hurt_rows, columns=["game_id", "season", "week", "season_type",
-                                             "team", "jersey", "short_name", "play_id"])
-    # A player can go down more than once; keep only their last exit that game.
+    hurt = pd.DataFrame(hurt_rows, columns=["game_id", "season", "week", "season_type", "team", "jersey",
+                                             "short_name", "play_id", "qtr", "game_clock", "notes"])
+    # A player can go down more than once; keep only their last exit that game
+    # -- qtr/game_clock/notes ride along with it, since they're columns on the
+    # same row, not a separate lookup.
     hurt = (hurt.sort_values("play_id")
                 .groupby(["game_id", "team", "jersey"], as_index=False).last()
                 .rename(columns={"play_id": "hurt_play_id"}))

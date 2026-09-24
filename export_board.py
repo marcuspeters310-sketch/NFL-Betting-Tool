@@ -141,7 +141,8 @@ def availability_payload(av: dict) -> dict:
     hurt_last = av.get("hurt_last_game")
     hurt_last_game = [] if hurt_last is None or hurt_last.empty else [
         {"name": text(r["player_name"]), "pos": text(r["position"]),
-         "returned": bool(r["returned"]), "opp": text(r["opponent"])}
+         "returned": bool(r["returned"]), "opp": text(r["opponent"]),
+         "qtr": num(r.get("qtr")), "clock": text(r.get("game_clock")), "notes": text(r.get("notes"))}
         for r in hurt_last.to_dict("records")
     ]
     hurt_last_game_date = None if hurt_last is None or hurt_last.empty else text(hurt_last.iloc[0]["gameday"])

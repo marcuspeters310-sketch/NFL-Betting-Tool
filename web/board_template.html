@@ -173,13 +173,16 @@ details.more[open] summary{margin-bottom:10px}
 .share .track b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ink);opacity:.55}
 .notice{font-size:12.5px;background:color-mix(in srgb,var(--chalk) 16%,var(--surface));border:1px solid color-mix(in srgb,var(--chalk) 50%,var(--line));border-radius:6px;padding:6px 9px}
 .notice.hlg{margin-top:8px;display:grid;gap:6px}
-.hlg-list{display:grid;gap:4px}
-.hlg-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;background:var(--surface);border-radius:6px;padding:5px 8px}
+.hlg-list{display:grid;gap:6px}
+.hlg-row{background:var(--surface);border-radius:6px;padding:6px 8px;display:grid;gap:3px}
+.hlg-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .hlg-row .who{font-weight:600}
 .hlg-row .role{font-size:11px;color:var(--muted)}
 .hlg-row .hlg-tag{margin-left:auto;font-size:11px;font-weight:600}
 .hlg-row.out .hlg-tag{color:var(--bad-strong)}
 .hlg-row.back .hlg-tag{color:var(--good)}
+.hlg-when{font-size:11px;font-weight:600;color:var(--muted)}
+.hlg-notes{font-size:11.5px;color:var(--muted);line-height:1.35}
 /* ---- trends chart ---- */
 .chart{position:relative}
 .chart svg{display:block;width:100%;height:auto;overflow:visible}
@@ -473,12 +476,20 @@ function card(p){
     ${p.rp ? `<div class="det">Next man up: <b>${esc(p.rp)}</b></div>${shareBar(p.rsh, "His snaps")}` : ""}
   </div>`;
 }
+function qtrLabel(qtr){
+  return qtr == null ? "" : qtr <= 4 ? `Q${qtr}` : "OT";
+}
 function hurtLastGameBlock(av){
   if (av.current || !av.hurt_last_game?.length) return "";
-  const rows = av.hurt_last_game.map(p => `<div class="hlg-row ${p.returned ? "back" : "out"}">
-      <span class="who">${esc(p.name)}</span><span class="role">${esc(p.pos)}</span>
-      <span class="hlg-tag">${p.returned ? "Returned to that game" : "Did not return"}</span>
-    </div>`).join("");
+  const rows = av.hurt_last_game.map(p => {
+    const when = [qtrLabel(p.qtr), p.clock].filter(Boolean).join(" ");
+    return `<div class="hlg-row ${p.returned ? "back" : "out"}">
+      <div class="hlg-top"><span class="who">${esc(p.name)}</span><span class="role">${esc(p.pos)}</span>
+        <span class="hlg-tag">${p.returned ? "Returned to that game" : "Did not return"}</span></div>
+      ${when ? `<div class="hlg-when">${esc(when)}</div>` : ""}
+      ${p.notes ? `<div class="hlg-notes">${esc(p.notes)}</div>` : ""}
+    </div>`;
+  }).join("");
   return `<div class="notice hlg">
     <b>Hurt last game</b> (vs ${esc(av.hurt_last_game[0].opp)}) -- this week's official injury report isn't out yet, so this is from the play-by-play, not a diagnosis.
     <div class="hlg-list">${rows}</div>

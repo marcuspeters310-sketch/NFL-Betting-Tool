@@ -438,11 +438,11 @@ import pandas as _pd
 from sources.pbp import parse_injuries, HURT_RE, RETURN_RE
 
 sample_pbp = _pd.DataFrame([
-    ("G1", 2099, 1, "REG", 10, "ARI-50-C.Simon was injured during the play. ARI-32-J.Blount was injured during the play."),
-    ("G1", 2099, 1, "REG", 30, "NO-12-C.Olave was injured during the play."),
-    ("G1", 2099, 1, "REG", 40, "** Injury Update: NO-12-C.Olave has returned to the game."),
-    ("G1", 2099, 1, "REG", 50, "NO-12-C.Olave was injured during the play."),   # hurt again, no return after
-], columns=["game_id", "season", "week", "season_type", "play_id", "desc"])
+    ("G1", 2099, 1, "REG", 10, "ARI-50-C.Simon was injured during the play. ARI-32-J.Blount was injured during the play.", 1, "12:00"),
+    ("G1", 2099, 1, "REG", 30, "NO-12-C.Olave was injured during the play.", 2, "9:14"),
+    ("G1", 2099, 1, "REG", 40, "** Injury Update: NO-12-C.Olave has returned to the game.", 2, "7:02"),
+    ("G1", 2099, 1, "REG", 50, "(Shotgun) pass short right to C.Olave for 8 yards. NO-12-C.Olave was injured during the play.", 3, "4:41"),  # hurt again, no return after
+], columns=["game_id", "season", "week", "season_type", "play_id", "desc", "qtr", "time"])
 parsed = parse_injuries(sample_pbp).set_index(["team", "jersey"])
 check("hurt-during-the-play regex catches every mention in a multi-injury play",
       {("ARI", 50), ("ARI", 32), ("NO", 12)} == set(parsed.index), str(parsed.index.tolist()))
@@ -454,6 +454,12 @@ check("a player who never shows a return line is marked not-returned",
 check("HURT_RE / RETURN_RE don't cross-match each other's phrasing",
       not HURT_RE.search("Injury Update: ARI-50-C.Simon has returned to the game.")
       and not RETURN_RE.search("ARI-50-C.Simon was injured during the play."))
+check("qtr/game_clock/notes ride along with the LAST hurt play, not an earlier one",
+      parsed.loc[("NO", 12), "qtr"] == 3 and parsed.loc[("NO", 12), "game_clock"] == "4:41"
+      and "for 8 yards" in parsed.loc[("NO", 12), "notes"],
+      str(parsed.loc[("NO", 12), ["qtr", "game_clock", "notes"]].to_dict()))
+check("notes is the play's full charted text, not just the injury phrase",
+      parsed.loc[("ARI", 50), "notes"] == sample_pbp.iloc[0]["desc"])
 
 r = conn.execute("SELECT COUNT(*) AS n FROM game_injury_events WHERE returned NOT IN (0, 1)").fetchone()
 check("game_injury_events.returned is always 0 or 1", r["n"] == 0, f"{r['n']} bad rows")
@@ -463,6 +469,12 @@ r = conn.execute("""
     WHERE g.game_id IS NULL OR e.team NOT IN (g.home_team, g.away_team)
 """).fetchone()
 check("every injury event's team actually played in that game_id", r["n"] == 0, f"{r['n']} orphaned/mismatched rows")
+r = conn.execute("SELECT COUNT(*) AS n FROM game_injury_events WHERE qtr IS NOT NULL AND (qtr < 1 OR qtr > 5)").fetchone()
+check("game_injury_events.qtr, where known, is 1-4 or 5 (OT)", r["n"] == 0, f"{r['n']} out-of-range rows")
+
+hlg_sample = queries.hurt_last_game("CHI", conn=conn)
+check("hurt_last_game() carries qtr/game_clock/notes columns through from game_injury_events",
+      {"qtr", "game_clock", "notes"} <= set(hlg_sample.columns), str(hlg_sample.columns.tolist()))
 
 # ---------------------------------------------------------------------------
 # The ATS chart's "since" window: uncapped, still oldest-first for the caller

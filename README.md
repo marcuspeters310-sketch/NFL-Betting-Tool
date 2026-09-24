@@ -60,7 +60,13 @@
   `game_injury_events` table, `queries.hurt_last_game`). It's the NFL's own
   gamebook charting, not a diagnosis: it knows what happened on the field
   that day, nothing about a Monday MRI or a setback at practice. Suppressed
-  automatically once that week's real report is out.
+  automatically once that week's real report is out. Each entry also shows
+  *when* it happened (quarter and game clock) and the full charted play
+  text as a note, e.g. "Q3 8:42 -- (Shotgun) T.Tagovailoa pass short right
+  to J.Waddle to MIA 45 for 12 yards (J.Smith). ARI-50-C.Simon was injured
+  during the play." -- both read straight off that same play, no extra
+  download. Games whose play-by-play was loaded before this existed show
+  the note without a timestamp until that season reloads (see Notes).
 - **Depth chart and injuries is frozen to Week 1, not today:** the depth
   chart shown (Teams page and the game page's Roster tab) is the roster as
   it stood right before Week 1 kicked off (the first ESPN depth-chart
@@ -309,7 +315,7 @@ into it, so `web\NFL Board.html` also opens fine straight from your folder.
 ## Command line
 
 ```
-python verify.py              # 74 checks — run this first
+python verify.py              # 78 checks — run this first
 python show.py slate          # this week's games in kickoff order
 python show.py slate 2025 12  # any past week, with results and ATS outcomes
 python show.py team CHI       # Bears ATS splits, last 3 seasons
@@ -348,11 +354,11 @@ returns `n` alongside the percentage.
 | `config.py` | Paths, URLs, season constants, `CHART_SINCE_SEASON` for the ATS chart. One place to change anything. |
 | `db.py` | Connection, table definitions (including `game_injury_events`, `depth_chart_opening`), and the derived SQL views. The interesting part. |
 | `sources/nflverse.py` | Downloads the nflverse games file and upserts it. Safe to re-run any time. |
-| `sources/pbp.py` | Downloads play-by-play and adds it up to one row per team per game (`team_game_stats`), including pace, neutral pass rate, explosives and fumbles. Also regexes "was injured during the play" / "has returned to the game" out of the same download into `game_injury_events` (`parse_injuries`). Loads 2024-2026 (2024 only for the model backtest). |
+| `sources/pbp.py` | Downloads play-by-play and adds it up to one row per team per game (`team_game_stats`), including pace, neutral pass rate, explosives and fumbles. Also regexes "was injured during the play" / "has returned to the game" out of the same download into `game_injury_events` (`parse_injuries`), along with that play's quarter, game clock and full charted text. Loads 2024-2026 (2024 only for the model backtest). |
 | `sources/rosters.py` | Depth charts -- both the latest daily snapshot (`depth_chart`) and the frozen Week 1 one (`depth_chart_opening`, anchored to that season's roster cutdown via `_opening_day_anchor`, both from the same download) -- injury reports, weekly roster status (IR, PUP, NFI), snap counts. |
 | `backfill.py` | Builds the database. Run again after any Sunday to pull in results. Run with `--full` once after upgrading to this feature, so `game_injury_events` backfills for already-cached seasons. |
 | `queries.py` | Every number the screens display comes from here: `team_metrics()`, `matchup_table()`, `ats_angles()`, `recent_games()` (last-N, or `since_season=` for the full ATS chart), `game_box_score()` (a played game's real stats, for the results view), `availability()` (depth chart frozen to `depth_chart_opening`, current status overlaid, `"gone"` status for anyone who's left the roster) / `hurt_last_game()`, `roster_changes()` (year-over-year turnover, deliberately still against `depth_chart`'s latest snapshot), `model_lines()`, `model_backtest()`, `luck_table()`. |
-| `verify.py` | 74 checks: ATS logic, team metrics, cover margins, injury overlay, in-game injury parsing, week-visibility rules, results-view stats, model (out-of-sample, sane constants), luck, pace. Re-run after any change. |
+| `verify.py` | 78 checks: ATS logic, team metrics, cover margins, injury overlay, in-game injury parsing, week-visibility rules, results-view stats, model (out-of-sample, sane constants), luck, pace. Re-run after any change. |
 | `app.py` | **Screen 1.** The board itself. `streamlit run app.py` |
 | `Run NFL Board.bat` | Double-click launcher for Windows. |
 | `export_board.py` | Builds the website snapshot: `board_data.json` + `web\NFL Board.html`. `determine_weeks()` / `show_next_week()` decide which weeks are upcoming vs. results. |
@@ -426,7 +432,11 @@ Two things exist ahead of when they're needed:
   source of truth and replaces this note automatically once it's filed.
 - `game_injury_events` only backfills for seasons `pbp.py` actually
   re-downloads. Existing (cached) completed seasons won't have it until you
-  run `python backfill.py --full` once.
+  run `python backfill.py --full` once. The same is true for that table's
+  `qtr` / `game_clock` / `notes` columns specifically -- a season loaded
+  before they existed shows old rows with those three blank until it's
+  re-downloaded (current season: automatic on the next refresh; older
+  seasons: `--full`).
 - **`depth_chart_opening` fills itself in retroactively.** ESPN's daily depth
   chart snapshots for a season cover the whole year, offseason included, so
   the very first `python backfill.py` run after upgrading to this feature
