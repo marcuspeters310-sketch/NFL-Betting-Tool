@@ -149,6 +149,7 @@ details.more[open] summary{margin-bottom:10px}
 .st.doubtful{background:var(--bad-bg);color:var(--bad)}
 .st.questionable{background:var(--chalk);color:var(--chalk-ink)}
 .st.limited{border:1px solid var(--line);color:var(--muted);padding:2px 4px}
+.st.gone{background:var(--line);color:var(--muted)}
 .depth{display:grid;gap:0}
 .depth .row{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);align-items:baseline}
 .depth .row:last-child{border-bottom:0}
@@ -162,6 +163,7 @@ details.more[open] summary{margin-bottom:10px}
 .hcard.out{border-left:3px solid var(--bad-strong)}
 .hcard.doubtful{border-left:3px solid var(--bad)}
 .hcard.questionable{border-left:3px solid var(--chalk)}
+.hcard.gone{border-left:3px dashed var(--muted)}
 .hcard .htop{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
 .hcard .who{font-weight:600}
 .hcard .role{font-size:12px;color:var(--muted)}
@@ -325,11 +327,12 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 .dbtn{border:0;padding:0;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .dbtn.on{text-decoration:underline;text-underline-offset:3px}
 .tag{font-size:11px;font-weight:700;margin-left:2px}
-.tag.out{color:var(--bad)} .tag.doubtful,.tag.questionable,.tag.limited{color:#B07A00}
+.tag.out{color:var(--bad)} .tag.doubtful,.tag.questionable,.tag.limited{color:#B07A00} .tag.gone{color:var(--muted)}
 :root[data-theme="dark"] .tag.doubtful,:root[data-theme="dark"] .tag.questionable,:root[data-theme="dark"] .tag.limited{color:var(--chalk)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tag.doubtful,:root:not([data-theme="light"]) .tag.questionable,:root:not([data-theme="light"]) .tag.limited{color:var(--chalk)}}
 .dsel{margin:10px 12px 0;padding:10px 12px;border-radius:8px;background:var(--bad-bg);display:flex;flex-direction:column;gap:2px;font-size:12.5px}
 .dsel.questionable,.dsel.doubtful,.dsel.limited{background:color-mix(in srgb,var(--chalk) 18%,var(--surface))}
+.dsel.gone{background:color-mix(in srgb,var(--muted) 18%,var(--surface))}
 .dsel-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:14px}
 .dsel-h small{font-weight:400;color:var(--muted)}
 .tagword{font-size:12px;font-weight:700}
@@ -419,8 +422,9 @@ const modelSpread = (g, margin) => margin == null ? "–" : Math.abs(margin) < 0
 const SHORT = {"Injured reserve": "IR", "PUP list": "PUP", "Non-football injury list": "NFI", "Reserve list": "RES"};
 function pill(x, rs){
   if (x === "active") return "";
-  const label = x === "out" ? (SHORT[rs] || "OUT") : x === "doubtful" ? "D" : x === "questionable" ? "Q" : "LP";
-  const title = x === "limited" ? "Limited or no practice, no game status" : (rs || x);
+  const label = x === "gone" ? "GONE" : x === "out" ? (SHORT[rs] || "OUT") : x === "doubtful" ? "D" : x === "questionable" ? "Q" : "LP";
+  const title = x === "gone" ? "Not on this team's current roster (released, retired, or traded)"
+    : x === "limited" ? "Limited or no practice, no game status" : (rs || x);
   return `<span class="st ${x}" title="${esc(title)}">${label}</span>`;
 }
 
@@ -442,7 +446,7 @@ function depthBoard(av, side){
     rows.get(p.p).push(p);
   }
   return `<div class="depth">${[...rows].map(([pos, ps]) => `<div class="row"><span class="pos">${pos}</span><span class="names">${
-    ps.map(p => `<span class="${p.st ? "p1" : "dim"} ${p.x === "out" ? "hurt-out" : ""}">${esc(p.n)}</span>${pill(p.x, p.rs)}`).join("")
+    ps.map(p => `<span class="${p.st ? "p1" : "dim"} ${(p.x === "out" || p.x === "gone") ? "hurt-out" : ""}">${esc(p.n)}</span>${pill(p.x, p.rs)}`).join("")
   }</span></div>`).join("")}</div>`;
 }
 function shareBar(v, label){
@@ -495,7 +499,7 @@ function availabilityPanel(t){
       ${av.other.map(r => `<tr><td>${esc(r.player_name)}</td><td>${esc(r.position)}</td><td>${esc(r.report_status || "Limited practice")}</td><td>${esc(r.injury || "")}</td><td class="r num">${r.snap_share == null ? "–" : Math.round(r.snap_share*100) + "%"}</td></tr>`).join("")}
       </tbody></table></div></details>` : "");
   return `<div class="block"><h4>${t} ${NAMES[t] || ""}</h4>
-    <p class="notice">${esc(note)} Depth chart as of ${esc(av.snapshot)}.</p>
+    <p class="notice">${esc(note)} Depth chart is this team's Week 1 lineup (set ${esc(av.snapshot)}), so you can see how much it's changed -- current status is layered on top of each opening-week slot, not swapped in for it.</p>
     ${hurtLastGameBlock(av)}
     <h3 class="sec-h" style="margin-top:10px">Not fully available</h3>${hurtCards(av, false)}
     ${extra}
@@ -964,6 +968,7 @@ function renderWeek(){
       <p>Tiles start condensed -- teams, kickoff, spread, and each team's last 3 games ATS and O/U. Tap <b>More ▼</b> for the full matchup breakdown.</p>
       <p>Next week's slate joins the board from Wednesday on; the week switcher above also holds every finished week's results once its games are done.</p>
       ${anyStale ? `<p>This week's injury reports aren't all out yet (teams file Wednesday to Friday), so some hurt-starter counts use last week's report.</p>` : ""}
+      <p><b>Depth chart and injuries</b> is frozen to each team's Week 1 lineup, not today's reshuffled one -- so a Week 1 starter who's since been hurt, benched or has left the team entirely still shows in their opening slot, tagged with what's happened to them. That's on purpose: it's the easiest way to see how much a roster has actually been depleted since the season started. A <b>GONE</b> tag means the player is no longer on this team's roster at all (released, retired, or traded), which the injury report alone won't tell you.</p>
     </div></details>
     ${byDay.map(d => `<section class="day"><h3>${fmtDate(d.date, d.weekday)}</h3><div class="tiles-grid">${d.games.map(gameTile).join("")}</div></section>`).join("")}
     <p class="foot">Kickoff times are Eastern. Data: nflverse (schedules, lines, play-by-play, depth charts, injuries) and Open-Meteo (weather). Results through ${esc(D.results_through)}. Lines update with each refresh, so check current prices at your sportsbook before betting.</p>
@@ -1010,10 +1015,10 @@ function logsPane(t){
   }).join("") + `<p class="meta">Line is the team's spread (− = favored). The number under ATS is how many points the team beat (+) or missed (−) the spread by; under O/U it's total points minus the closing total. Playoff games are labeled WC, DIV, CONF and SB.</p>`;
 }
 
-const TAG_TEXT = {out: "Out", doubtful: "Doubtful", questionable: "Questionable", limited: "Limited practice"};
+const TAG_TEXT = {out: "Out", doubtful: "Doubtful", questionable: "Questionable", limited: "Limited practice", gone: "Off roster"};
 function tagFor(p){
   if (p.x === "active") return "";
-  const label = p.x === "out" ? (SHORT[p.rs] || "OUT") : p.x === "doubtful" ? "D" : p.x === "questionable" ? "Q" : "LP";
+  const label = p.x === "gone" ? "GONE" : p.x === "out" ? (SHORT[p.rs] || "OUT") : p.x === "doubtful" ? "D" : p.x === "questionable" ? "Q" : "LP";
   return `<span class="tag ${p.x}">${label}</span>`;
 }
 function depthGrid(t, side){
@@ -1089,7 +1094,7 @@ function rosterPane(t){
     : av.current ? `Week ${av.report_week} injury report.`
     : `The week ${av.week} injury report isn't out yet (teams file Wednesday to Friday), so tags come from week ${av.report_week}.`;
   return `${changesBox(t)}${av ? hurtLastGameBlock(av) : ""}${depthGrid(t, "O")}${depthGrid(t, "D")}
-    <p class="meta">${note} Tags: Q questionable, D doubtful, OUT, IR injured reserve, PUP / NFI other reserve lists, RES other reserve list, LP limited practice. Depth chart snapshot ${esc(av?.snapshot || "")}.</p>`;
+    <p class="meta">${note} Tags: Q questionable, D doubtful, OUT, IR injured reserve, PUP / NFI other reserve lists, RES other reserve list, LP limited practice, GONE no longer on this team's roster. Slots are frozen to this team's Week 1 depth chart (${esc(av?.snapshot || "")}) so you can see how far it's been depleted; current status is overlaid on each slot.</p>`;
 }
 function splitCell(x, right){
   if (!x || !x.n) return `<span class="c ${right ? "r" : "l"} stack2"><span class="num">–</span><small class="soft">no games</small></span>`;

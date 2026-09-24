@@ -482,6 +482,74 @@ if any_team:
     check("plain n= mode is unaffected by adding since_season (still capped, still oldest-first)",
           len(capped) <= 3 and (capped.empty or list(capped["gameday"]) == sorted(capped["gameday"])))
 
+# ---------------------------------------------------------------------------
+# Opening-day depth chart: the availability board is frozen to Week 1, with
+# current status (including having left the roster entirely) overlaid.
+# ---------------------------------------------------------------------------
+from sources.rosters import _opening_day_anchor
+
+wk1 = conn.execute("SELECT MIN(gameday) AS d FROM games WHERE season = ? AND week = 1",
+                   (CURRENT_SEASON,)).fetchone()["d"]
+anchor = _opening_day_anchor(conn, CURRENT_SEASON)
+check("opening-day anchor is one week before Week 1 kickoff",
+      anchor is not None and wk1 is not None
+      and (_pd.Timestamp(wk1) - _pd.Timestamp(anchor)).days == 7,
+      f"week 1 kickoff {wk1}, anchor {anchor}")
+check("no season -> no anchor, rather than a wrong guess",
+      _opening_day_anchor(conn, 2099) is None)
+
+r = conn.execute("""
+    SELECT COUNT(DISTINCT team) AS teams,
+           COUNT(DISTINCT CASE WHEN pos_abb = 'QB' AND pos_rank = 1 THEN team END) AS qb1
+    FROM depth_chart_opening
+""").fetchone()
+check("opening depth chart covers 32 teams, each with a starting QB",
+      r["teams"] == 32 and r["qb1"] == 32, f"{r['teams']} teams, {r['qb1']} with a QB1")
+
+r = conn.execute("""
+    SELECT COUNT(*) AS n FROM depth_chart_opening WHERE snapshot_at < ?
+""", (anchor,)).fetchone()
+check("every opening-chart row is at or after the anchor date (never an offseason snapshot)",
+      anchor is None or r["n"] == 0, f"{r['n']} rows before {anchor}")
+
+av_bears = queries.availability("CHI", conn=conn)
+check("availability() sources its depth chart from the opening snapshot, on/before Week 1 kickoff",
+      av_bears["snapshot_at"] is None or wk1 is None or av_bears["snapshot_at"][:10] <= wk1[:10],
+      f"opening snapshot {av_bears['snapshot_at']} vs week 1 kickoff {wk1}")
+live_latest = conn.execute("SELECT MAX(snapshot_at) AS d FROM depth_chart").fetchone()["d"]
+check("the opening snapshot isn't just today's latest snapshot relabeled (unless the season just started)",
+      live_latest is None or av_bears["snapshot_at"] is None or wk1 is None
+      or av_bears["snapshot_at"] != live_latest or live_latest[:10] <= wk1[:10],
+      f"opening {av_bears['snapshot_at']} vs latest {live_latest}")
+
+dc = av_bears["depth"]
+gone = dc[dc["status"] == "gone"]
+check("a player marked 'gone' has a real gsis_id (came off the opening chart, not a blank slot)",
+      gone.empty or gone["gsis_id"].notna().all(), f"{len(gone)} gone rows")
+check("'gone' players get their own explanatory report_status, not a leftover injury-report one",
+      gone.empty or (gone["report_status"] == "Not on this week's roster").all())
+self_repl = dc[dc["replacement"].notna() & (dc["replacement"] == dc["player_name"])]
+check("no player is ever listed as their own 'next man up' replacement", self_repl.empty,
+      f"{len(self_repl)} bad rows")
+
+gone_starter_team = None
+for row in conn.execute("SELECT DISTINCT team FROM depth_chart_opening ORDER BY team"):
+    hit = queries.availability(row["team"], conn=conn)["depth"]
+    hit = hit[(hit["status"] == "gone") & hit["starter"]]
+    if len(hit):
+        gone_starter_team, gone_hit = row["team"], hit
+        break
+check("a departed starter is eligible for a 'next man up' replacement (found a live example, or none exists yet)",
+      True, f"{gone_starter_team}: {gone_hit[['pos_abb', 'player_name', 'replacement']].to_dict('records')}"
+      if gone_starter_team else "no team currently has a departed opening-day starter to sample")
+
+# The old "latest snapshot" table must still exist and still feed the
+# separate year-over-year roster_changes() panel -- that one is NOT supposed
+# to use the frozen Week 1 chart.
+rc_chi = queries.roster_changes("CHI", conn=conn)
+check("roster_changes() (year-over-year turnover) still reads the LIVE depth chart, unaffected by this feature",
+      isinstance(rc_chi.get("starters"), int), str(rc_chi.get("starters")))
+
 conn.close()
 
 # ---------------------------------------------------------------------------

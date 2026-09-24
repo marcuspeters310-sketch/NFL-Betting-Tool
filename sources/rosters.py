@@ -4,8 +4,15 @@ Player availability loaders: depth charts, injury reports, roster status
 
 Where each piece comes from and how fresh it is:
 
-  depth_charts_{season}   ESPN depth charts, snapshotted daily. We keep only
-                          each team's most recent snapshot.
+  depth_charts_{season}   ESPN depth charts, snapshotted daily since the
+                          offseason. We keep two slices of this: each team's
+                          most recent snapshot (depth_chart), and the first
+                          snapshot on/after that season's roster cutdown
+                          (depth_chart_opening) -- the "beginning of the
+                          year" roster the availability board is overlaid
+                          onto. One CSV download gives us both, since
+                          nflverse keeps the whole season's daily history in
+                          the same file rather than only the latest day.
   injuries_{season}       The official NFL injury report (Wed-Fri). Each week's
                           report shows up once teams start filing it, so the
                           upcoming week can be missing early in the week.
@@ -19,6 +26,7 @@ transaction, so a failed download never leaves a table half-written.
 from __future__ import annotations
 
 import io
+from typing import Optional
 
 import pandas as pd
 import requests
@@ -54,21 +62,61 @@ def _replace(conn, table: str, cols: list[str], rows: list[tuple], where: str = 
 
 # ---------------------------------------------------------------------------
 
-def load_depth_charts(conn, season: int = CURRENT_SEASON) -> int:
-    df = _csv(DEPTH_CHARTS_URL.format(season=season))
-    # Latest snapshot per team.
-    df = df[df["dt"] == df.groupby("team")["dt"].transform("max")].copy()
+def _tag_side(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
     grp = df["pos_grp"].fillna("")
     df["side"] = "O"
     df.loc[grp.str.endswith(" D") | grp.str.contains("Defense"), "side"] = "D"
     df.loc[grp.str.contains("Special"), "side"] = "ST"
-    out = pd.DataFrame({
+    return df
+
+
+def _depth_rows(df: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame({
         "team": df["team"], "side": df["side"], "formation": df["pos_grp"],
         "pos_abb": df["pos_abb"], "pos_slot": df["pos_slot"], "pos_rank": df["pos_rank"],
         "player_name": df["player_name"], "gsis_id": df["gsis_id"],
         "espn_id": df["espn_id"].astype("Int64").astype(str), "snapshot_at": df["dt"],
     })
-    return _replace(conn, "depth_chart", list(out.columns), _clean(out))
+
+
+def _opening_day_anchor(conn, season: int) -> Optional[str]:
+    """
+    The dt cutoff that marks "the beginning of the year" for a depth chart.
+
+    ESPN's daily snapshots go back to the offseason (roster building, OTAs,
+    training camp), so the earliest snapshot on file is NOT what anyone means
+    by "opening day" -- it's March or April. Final roster cutdowns happen a
+    few days before Week 1 kicks off, so we anchor to one week before that
+    season's Week 1 kickoff and take the first snapshot on/after it. Using
+    the schedule instead of a hardcoded calendar date means this keeps
+    working automatically as Week 1's date moves year to year.
+
+    Returns None if Week 1 hasn't been loaded into `games` yet.
+    """
+    row = conn.execute(
+        "SELECT MIN(gameday) AS d FROM games WHERE season = ? AND week = 1", (season,),
+    ).fetchone()
+    if row is None or row["d"] is None:
+        return None
+    anchor = pd.Timestamp(row["d"]) - pd.Timedelta(days=7)
+    return anchor.strftime("%Y-%m-%d")
+
+
+def load_depth_charts(conn, season: int = CURRENT_SEASON) -> int:
+    df = _tag_side(_csv(DEPTH_CHARTS_URL.format(season=season)))
+
+    latest = df[df["dt"] == df.groupby("team")["dt"].transform("max")].copy()
+    n = _replace(conn, "depth_chart", list(_depth_rows(latest).columns), _clean(_depth_rows(latest)))
+
+    anchor = _opening_day_anchor(conn, season)
+    if anchor is not None:
+        eligible = df[df["dt"] >= anchor]
+        if not eligible.empty:
+            opening = eligible[eligible["dt"] == eligible.groupby("team")["dt"].transform("min")].copy()
+            rows = _depth_rows(opening)
+            _replace(conn, "depth_chart_opening", list(rows.columns), _clean(rows))
+    return n
 
 
 def load_injuries(conn, season: int = CURRENT_SEASON) -> int:

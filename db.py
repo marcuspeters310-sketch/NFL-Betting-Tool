@@ -141,7 +141,16 @@ CREATE INDEX IF NOT EXISTS idx_tgs_season ON team_game_stats(season, week);
 -- Player availability. All four tables are replaced wholesale on each load.
 --
 -- depth_chart: the latest daily depth chart snapshot for every team. One row
---   per player per slot; pos_rank 1 is the starter, 2 the next man up.
+--   per player per slot; pos_rank 1 is the starter, 2 the next man up. Used
+--   for year-over-year "who's new" comparisons (queries.roster_changes) --
+--   NOT for the injury-status board, which uses depth_chart_opening below.
+-- depth_chart_opening: the SAME shape, frozen at the first snapshot on/after
+--   that season's roster cutdown (see sources/rosters.py::_opening_day_anchor).
+--   This is what the availability board displays: the roster as it stood
+--   going into the season, so a Week 1 starter who's since been hurt, cut or
+--   replaced still shows up in their opening slot -- current status (hurt,
+--   off the roster, etc.) is overlaid on top of this fixed structure, rather
+--   than the board silently "moving on" to whoever plays that slot now.
 -- injury_reports: the official Wed-Fri report, final version per week.
 -- roster_status: weekly roster status -- this is where injured reserve and
 --   other long-term lists live (they are not on the weekly injury report).
@@ -161,6 +170,20 @@ CREATE TABLE IF NOT EXISTS depth_chart (
     snapshot_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_dc_team ON depth_chart(team, side);
+
+CREATE TABLE IF NOT EXISTS depth_chart_opening (
+    team         TEXT NOT NULL,
+    side         TEXT NOT NULL,      -- 'O', 'D', 'ST'
+    formation    TEXT,               -- e.g. '3WR 1TE', 'Base 4-3 D'
+    pos_abb      TEXT NOT NULL,      -- QB, LT, WR, LDE, NB ...
+    pos_slot     INTEGER,            -- display order of the position within the formation
+    pos_rank     INTEGER NOT NULL,   -- 1 = starter
+    player_name  TEXT,
+    gsis_id      TEXT,
+    espn_id      TEXT,
+    snapshot_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_dco_team ON depth_chart_opening(team, side);
 
 CREATE TABLE IF NOT EXISTS injury_reports (
     season           INTEGER NOT NULL,

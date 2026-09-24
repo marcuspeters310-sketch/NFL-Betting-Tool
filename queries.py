@@ -861,9 +861,13 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
                            (season,)).fetchone()
         week = row["w"] or 18
 
+    # depth_chart_opening, not depth_chart: the board shows the roster as it
+    # stood going into the season (see db.py's comment on that table), with
+    # current injury/roster status overlaid below -- not whatever the depth
+    # chart has already been reshuffled to today.
     depth = pd.read_sql_query("""
         SELECT side, formation, pos_abb, pos_slot, pos_rank, player_name, gsis_id, snapshot_at
-        FROM depth_chart WHERE team = ?
+        FROM depth_chart_opening WHERE team = ?
     """, conn, params=[team])
 
     rep_week = conn.execute("""
@@ -918,15 +922,26 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
             code = ro["status_code"] if isinstance(ro["status_code"], str) else ""
             report_status = RESERVE_LABELS.get(code, "Reserve list")
         share, basis = share_of(gid)
+
+        # Opening-day starters can leave entirely -- released, retired, traded
+        # -- not just get hurt. roster_weekly only lists players actually on a
+        # team, so a real gsis_id that shows up in NEITHER this week's roster
+        # nor the injury report has left the roster, not merely gone unlisted.
+        if gid and ir is None and ro is None:
+            status = "gone"
+            report_status = "Not on this week's roster"
+        else:
+            status = _status_bucket(ir["report_status"] if ir is not None else None,
+                                    ir["practice_status"] if ir is not None else None,
+                                    ros_status)
+
         rows.append({
             "side": d["side"], "formation": d["formation"], "pos_abb": d["pos_abb"],
             "pos_slot": None if pd.isna(d["pos_slot"]) else int(d["pos_slot"]),
             "pos_rank": int(d["pos_rank"]),
             "starter": int(d["pos_rank"]) <= STARTERS_AT.get(d["pos_abb"], 1),
             "player_name": _s(d["player_name"]) or "(unnamed)", "gsis_id": gid,
-            "status": _status_bucket(ir["report_status"] if ir is not None else None,
-                                     ir["practice_status"] if ir is not None else None,
-                                     ros_status),
+            "status": status,
             "report_status": report_status,
             "injury": injury_text(gid) if gid else None,
             "practice_status": ir["practice_status"] if ir is not None and isinstance(ir["practice_status"], str) else None,
@@ -935,12 +950,14 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
     dc = pd.DataFrame(rows)
 
     # Next man up for anyone not fully available: the best-ranked healthy
-    # player at the same position who isn't already a starter.
+    # player at the same position who isn't already a starter. "gone" counts
+    # here too -- a starter who's left the team entirely is at least as much
+    # of a lineup change as one who's questionable.
     if not dc.empty:
         dc["replacement"] = None
         dc["replacement_share"] = None
         for i, r in dc.iterrows():
-            if not r["starter"] or r["status"] not in ("out", "doubtful", "questionable"):
+            if not r["starter"] or r["status"] not in ("out", "doubtful", "questionable", "gone"):
                 continue
             pool = dc[(dc["pos_abb"] == r["pos_abb"]) & (dc["side"] == r["side"])
                       & (~dc["starter"]) & (dc["status"].isin(["active", "limited"]))
