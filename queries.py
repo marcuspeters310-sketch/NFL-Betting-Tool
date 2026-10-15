@@ -781,6 +781,28 @@ def _snap_shares(conn, season: int) -> pd.DataFrame:
     """, conn, params=[season, season - 1, season, season, season - 1, season - 1]).set_index("gsis_id")
 
 
+def _surname_matches(short_name, full_name) -> bool:
+    """Does a charted name like "A.St. Brown" match the roster name "Amon-Ra St. Brown"?"""
+    if not isinstance(short_name, str) or not isinstance(full_name, str):
+        return False
+    norm = lambda x: re.sub(r"[^a-z]", "", x.lower())
+    sur = norm(short_name.split(".", 1)[-1])
+    return bool(sur) and sur in norm(full_name)
+
+
+def _match_jerseys(ev: pd.DataFrame, names: pd.DataFrame, on: list[str]) -> pd.DataFrame:
+    """
+    Join charted injury events to the roster by jersey (plus `on` keys).
+    NFL teams can give one number to an offensive and a defensive player, so a
+    jersey can match two roster rows; keep the one whose surname matches the
+    charted name. One row per event comes out, as many as went in.
+    """
+    m = ev.reset_index(drop=True).reset_index(names="_ev").merge(names, on=on, how="left")
+    m["_ok"] = [_surname_matches(s, f) for s, f in zip(m["short_name"], m["full_name"])]
+    m = m.sort_values(["_ev", "_ok"], ascending=[True, False]).drop_duplicates("_ev")
+    return m.drop(columns=["_ev", "_ok"]).reset_index(drop=True)
+
+
 def hurt_last_game(team: str, season: int = CURRENT_SEASON, before_week: Optional[int] = None,
                     conn=None) -> pd.DataFrame:
     """
@@ -813,7 +835,7 @@ def hurt_last_game(team: str, season: int = CURRENT_SEASON, before_week: Optiona
         ORDER BY gameday DESC LIMIT 1
     """, (team, season, team, team, before_week, before_week)).fetchone()
 
-    cols = ["player_name", "position", "jersey", "returned", "opponent", "gameday", "week",
+    cols = ["player_name", "position", "jersey", "gsis_id", "returned", "opponent", "gameday", "week",
             "qtr", "game_clock", "notes"]
     if row is None:
         if close:
@@ -830,19 +852,123 @@ def hurt_last_game(team: str, season: int = CURRENT_SEASON, before_week: Optiona
         return pd.DataFrame(columns=cols)
 
     names = pd.read_sql_query("""
-        SELECT jersey, full_name, position FROM roster_status
+        SELECT jersey, full_name, position, gsis_id FROM roster_status
         WHERE season = ? AND team = ? AND week = ?
     """, conn, params=[season, team, row["week"]])
     if close:
         conn.close()
 
-    ev = ev.merge(names, on="jersey", how="left")
+    ev = _match_jerseys(ev, names, ["jersey"])
     ev["player_name"] = ev["full_name"].where(ev["full_name"].notna(), ev["short_name"])
     ev["opponent"] = row["opponent"]
     ev["gameday"] = row["gameday"]
     ev["week"] = row["week"]
     ev = ev.sort_values(["returned", "jersey"]).reset_index(drop=True)
     return ev[cols]
+
+
+def _run_start(listed_weeks: set, team_weeks: list, end: int) -> Optional[int]:
+    """
+    First week of the unbroken run of listings that ends at week `end`.
+    team_weeks are the weeks the team filed anything (a bye week has no
+    report, so it doesn't break a run). None if not listed at `end`.
+    """
+    if end not in listed_weeks:
+        return None
+    start = end
+    for w in sorted((w for w in team_weeks if w < end), reverse=True):
+        if w not in listed_weeks:
+            break
+        start = w
+    return start
+
+
+def injury_origins(team: str, season: int, week: int, conn) -> dict:
+    """
+    Where each listed player's injury came from, for the board's injury cards.
+
+    The only injuries we can SEE are the ones the play-by-play charts during a
+    game ("was injured during the play" -- see hurt_last_game). Everything
+    else is inferred from when a player first appears on a list:
+
+      k = "game"     charted as hurt in the team's last game before `week`
+      k = "reserve"  on IR/PUP/NFI in the latest weekly roster, since week `since`
+      k = "new"      first listed on the latest injury report, not charted in a game
+      k = "ongoing"  on every report since week `since` (bye weeks don't break it)
+
+    `g` is the game where the play-by-play charted the injury, when there is
+    one: the last game for "game", otherwise the team's game just before the
+    listing began. `gb` names that game-before ({"wk", "opp"}) whether or not
+    the player was charted in it, so the board can say which game was checked. A "new" listing with no charted game hurt usually means a
+    practice injury, but the charting can miss an injury or a player can be
+    listed for illness or rest, so the board says "likely", never "was".
+
+    Returns {"last_game": {"wk", "opp"} | None, "players": {gsis_id: {...}}}.
+    """
+    games = pd.read_sql_query("""
+        SELECT week, CASE WHEN home_team = ? THEN away_team ELSE home_team END AS opp
+        FROM games WHERE season = ? AND (home_team = ? OR away_team = ?)
+          AND result IS NOT NULL AND week < ?
+        ORDER BY week
+    """, conn, params=[team, season, team, team, week])
+    opp_of = dict(zip(games["week"], games["opp"]))
+    last_wk = int(games["week"].iloc[-1]) if len(games) else None
+
+    ev = pd.read_sql_query("""
+        SELECT week, jersey, short_name, returned, qtr, game_clock
+        FROM game_injury_events WHERE season = ? AND team = ? AND week < ?
+    """, conn, params=[season, team, week])
+    if len(ev):
+        names = pd.read_sql_query("""
+            SELECT week, jersey, full_name, gsis_id FROM roster_status WHERE season = ? AND team = ?
+        """, conn, params=[season, team])
+        ev = _match_jerseys(ev, names, ["week", "jersey"])
+        ev = ev[ev["gsis_id"].notna()]
+    hurt_at = {(int(r["week"]), r["gsis_id"]): r for r in ev.to_dict("records")}
+
+    def game_info(wk, gid):
+        r = hurt_at.get((wk, gid))
+        if r is None:
+            return None
+        return {"wk": wk, "opp": opp_of.get(wk), "ret": bool(r["returned"]),
+                "q": None if pd.isna(r["qtr"]) else int(r["qtr"]), "clk": _s(r["game_clock"]) or None}
+
+    def game_before(wk):
+        prior = [w for w in opp_of if w < wk]
+        return max(prior) if prior else None
+
+    rep = pd.read_sql_query("SELECT week, gsis_id FROM injury_reports WHERE season = ? AND team = ? AND week <= ?",
+                            conn, params=[season, team, week])
+    res = pd.read_sql_query("SELECT week, gsis_id, status FROM roster_status WHERE season = ? AND team = ? AND week <= ?",
+                            conn, params=[season, team, week])
+    rep_weeks, ros_weeks = sorted(set(rep["week"])), sorted(set(res["week"]))
+    rep_end = rep_weeks[-1] if rep_weeks else None
+    ros_end = ros_weeks[-1] if ros_weeks else None
+    on_rep = rep.groupby("gsis_id")["week"].agg(set).to_dict() if len(rep) else {}
+    res = res[res["status"] == "RES"]
+    on_res = res.groupby("gsis_id")["week"].agg(set).to_dict() if len(res) else {}
+
+    players = {}
+    for gid in set(on_rep) | set(on_res):
+        if ros_end is not None and ros_end in on_res.get(gid, set()):
+            k, since = "reserve", _run_start(on_res[gid], ros_weeks, ros_end)
+        elif rep_end is not None and rep_end in on_rep.get(gid, set()):
+            since = _run_start(on_rep[gid], rep_weeks, rep_end)
+            k = "new" if since == rep_end else "ongoing"
+        else:
+            continue
+        g = game_info(last_wk, gid) if last_wk is not None else None
+        gb = None
+        if g is not None:
+            k = "game"
+        else:
+            before = game_before(since)
+            if before is not None:
+                g = game_info(before, gid)
+                gb = {"wk": before, "opp": opp_of[before]}
+        players[gid] = {"k": k, "since": since, "g": g, "gb": gb}
+    return {"last_game": None if last_wk is None else {"wk": last_wk, "opp": opp_of[last_wk]},
+            "players": players}
 
 
 def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = None,
@@ -894,8 +1020,23 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
     """, conn, params=[season, team, ros_week if ros_week is not None else -1]).set_index("gsis_id")
 
     shares = _snap_shares(conn, season)
+    origins = injury_origins(team, season, week, conn)
+    try:
+        seen = {r["gsis_id"]: (r["first_seen_at"], bool(r["tracking_start"])) for r in conn.execute(
+            "SELECT gsis_id, first_seen_at, tracking_start FROM injury_status_log WHERE season = ? AND team = ?",
+            (season, team))}
+        src = conn.execute("SELECT updated_at, checked_at FROM source_updates WHERE source = ?",
+                           (f"injuries_{season}",)).fetchone()
+    except sqlite3.OperationalError:       # tables not created yet (database older than this code)
+        seen, src = {}, None
     if close:
         conn.close()
+
+    def when(gid):
+        """Origin + first-seen fields for a listed player (empty for everyone else)."""
+        o = origins["players"].get(gid)
+        s = seen.get(gid)
+        return {"origin": o, "first_seen": s[0] if s else None, "seen_at_start": s[1] if s else None}
 
     def share_of(gid):
         if gid is None or gid not in shares.index:
@@ -951,6 +1092,7 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
             "injury": injury_text(gid) if gid else None,
             "practice_status": ir["practice_status"] if ir is not None and isinstance(ir["practice_status"], str) else None,
             "snap_share": share, "snap_basis": basis,
+            **(when(gid) if gid and status != "gone" else when(None)),
         })
     dc = pd.DataFrame(rows)
 
@@ -982,6 +1124,7 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
         "player_name": r["full_name"], "position": r["position"],
         "list": RESERVE_LABELS.get(r["status_code"] if isinstance(r["status_code"], str) else "", "Reserve list"),
         "snap_share": share_of(gid)[0], "snap_basis": share_of(gid)[1],
+        **when(gid),
     } for gid, r in res.iterrows()])
     if not reserve.empty:
         reserve = reserve.sort_values("snap_share", ascending=False, na_position="last").reset_index(drop=True)
@@ -993,6 +1136,7 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
         "report_status": r["report_status"] if isinstance(r["report_status"], str) else None,
         "injury": injury_text(gid), "practice_status": r["practice_status"] if isinstance(r["practice_status"], str) else None,
         "snap_share": share_of(gid)[0], "snap_basis": share_of(gid)[1],
+        **when(gid),
     } for gid, r in other.iterrows()])
     if not other_injuries.empty:
         other_injuries = other_injuries[other_injuries["status"] != "active"]
@@ -1008,6 +1152,9 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
         "snapshot_at": depth["snapshot_at"].max() if len(depth) else None,
         "depth": dc, "reserve": reserve, "other_injuries": other_injuries,
         "hurt_last_game": hurt_last,
+        "last_game": origins["last_game"],
+        "injury_data_updated": src["updated_at"] if src else None,
+        "injury_data_checked": src["checked_at"] if src else None,
     }
 
 
@@ -1594,7 +1741,8 @@ def game_weather(game: dict, conn=None) -> dict:
                 r = None
             if r:
                 out.update(temp=r["temp_f"], wind=r["wind_mph"], gust=r["gust_mph"],
-                           precip=r["precip_pct"], source="forecast", fetched=r["fetched_at"])
+                           precip=r["precip_pct"], source="forecast", fetched=r["fetched_at"],
+                           kickoff_utc=r["kickoff_utc"])
     finally:
         if close:
             conn.close()

@@ -5,3 +5,6 @@ _site/
 board_data.json
 web/NFL Board.html
 data/nfl.db-journal
+.local/
+.wrangler/
+.dev.vars
