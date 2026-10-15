@@ -10,7 +10,7 @@
   --good:#17784A; --good-bg:#DDF1E6; --good-strong:#0E5E38; --good-strong-bg:#BFE6D0;
   --bad:#A8323F; --bad-bg:#F7E1E3; --bad-strong:#8A1F2C; --bad-strong-bg:#F0C6CB;
   --focus:#2F6FE0;
-  --cover:#2F6DB5; --miss:#C2601A;
+  --cover:#2F6DB5; --miss:#C2601A; --on-accent:#FFFFFF;
   --display:"Saira Condensed","Arial Narrow",Arial,sans-serif;
   --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
@@ -22,7 +22,7 @@
     --good:#5FC994; --good-bg:#16301F; --good-strong:#8FE0B6; --good-strong-bg:#1D4430;
     --bad:#EE8A95; --bad-bg:#35191D; --bad-strong:#F7B0B8; --bad-strong-bg:#4D2127;
     --focus:#7FA8F5;
-    --cover:#5B93D6; --miss:#D0742F;
+    --cover:#5B93D6; --miss:#D0742F; --on-accent:#0E1411;
   }
 }
 :root[data-theme="dark"]{
@@ -31,7 +31,7 @@
   --good:#5FC994; --good-bg:#16301F; --good-strong:#8FE0B6; --good-strong-bg:#1D4430;
   --bad:#EE8A95; --bad-bg:#35191D; --bad-strong:#F7B0B8; --bad-strong-bg:#4D2127;
   --focus:#7FA8F5;
-  --cover:#5B93D6; --miss:#D0742F;
+  --cover:#5B93D6; --miss:#D0742F; --on-accent:#0E1411;
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);padding-inline:16px;padding-block:0 48px}
@@ -48,6 +48,12 @@ button{font:inherit;color:inherit}
 .brand h1{font:700 26px/1 var(--display);letter-spacing:.01em;margin:0;text-transform:uppercase}
 .brand h1 span{background:var(--chalk);color:var(--chalk-ink);padding:0 6px;margin-left:2px}
 .stamp{font-size:12px;color:var(--muted)}
+.refresh{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.refresh svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.refresh.busy svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.refresh.busy svg{animation:none}}
+.refresh[hidden]{display:none}
 .seg{display:inline-flex;background:var(--sunk);border-radius:8px;padding:3px;gap:2px}
 .seg button{border:0;background:transparent;padding:6px 12px;border-radius:6px;font-weight:500;font-size:14px;cursor:pointer;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .12)}
@@ -168,6 +174,8 @@ details.more[open] summary{margin-bottom:10px}
 .hcard .who{font-weight:600}
 .hcard .role{font-size:12px;color:var(--muted)}
 .hcard .det{font-size:13px;color:var(--muted)}
+.origin{font-size:12.5px;line-height:1.35}
+.origin.game{font-weight:600}
 .share{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
 .share .track{height:6px;border-radius:3px;background:var(--sunk);position:relative;min-width:60px}
 .share .track b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ink);opacity:.55}
@@ -227,7 +235,10 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 .expand-btn{margin-left:auto;border:1px solid var(--line);background:var(--sunk);border-radius:7px;padding:5px 9px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
 .expand-btn:hover{color:var(--ink)}
 .ghead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:inherit;text-decoration:none}
-.gteams{font:700 26px/1 var(--display);text-transform:uppercase}
+.gteams{font:700 26px/1 var(--display);text-transform:uppercase;display:inline-flex;align-items:center}
+.tl{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.tlogo{width:1.15em;height:1.15em;object-fit:contain;flex:none}
+.ghero h2{display:flex;align-items:center;flex-wrap:wrap}
 .gteams .at,.ghero h2 .at{color:var(--muted);font-size:.75em;margin:0 5px}
 .gmeta{display:flex;gap:8px;align-items:baseline;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .more-link{font-size:12px;letter-spacing:0;text-transform:none;font-weight:600;color:var(--good)}
@@ -260,6 +271,19 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 .mrow .c .rk{min-width:0;font-size:10.5px;padding:1px 4px}
 .mid{display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.15;font-size:11.5px}
 .mid small{font-size:10px;color:var(--muted)}
+.mrow.sub{padding:3px 0;font-size:12px;border-top-style:dashed}
+.mrow.sub .mid>span{color:var(--muted)}
+.pick .pick-l{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 0 4px}
+.pick-sel{width:100%;max-width:420px;font:inherit;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.pick-text{margin:12px 0 10px;padding:12px 14px;border-left:3px solid var(--cover);background:var(--bg);border-radius:6px;line-height:1.5;font-size:14.5px;user-select:text}
+.pick-actions{display:flex;align-items:center;gap:10px}
+.pick-copy{font:600 14px var(--body);padding:8px 18px;border-radius:8px;border:1px solid var(--cover);background:var(--cover);color:var(--on-accent);cursor:pointer}
+.cstat{border-radius:4px;padding:0 4px}
+.cstat.st-up.st-strong{background:var(--cover);color:var(--on-accent);font-weight:600}
+.cstat.st-dn.st-strong{background:var(--miss);color:var(--on-accent);font-weight:600}
+.cstat.st-up.st-lean{background:color-mix(in srgb,var(--cover) 20%,transparent)}
+.cstat.st-dn.st-lean{background:color-mix(in srgb,var(--miss) 22%,transparent)}
+.t-sub td:first-child{padding-left:22px;color:var(--muted)}
 .hurt{color:var(--bad);font-weight:600}
 .zero{color:var(--muted)}
 .pos{color:var(--good)} .neg{color:var(--bad)}
@@ -357,7 +381,8 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 </style>
 
 <header class="top"><div class="wrap">
-  <div class="brand"><h1>NFL <span>Board</span></h1><span class="stamp" id="stamp"></span></div>
+  <div class="brand"><h1>NFL <span>Board</span></h1><span class="stamp" id="stamp"></span><span class="stamp" id="lines-stamp" aria-live="polite"></span></div>
+  <button type="button" class="refresh" id="refresh" hidden aria-label="Refresh game lines" title="Refresh game lines"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 3.5v3.2h-3.2"/></svg></button>
   <div class="seg" role="group" aria-label="View">
     <button id="tab-week" type="button" data-view="week">This week</button>
     <button id="tab-teams" type="button" data-view="teams">Teams</button>
@@ -373,6 +398,13 @@ const D = JSON.parse(document.getElementById("board-data").textContent);
 const NAMES = {ARI:"Cardinals",ATL:"Falcons",BAL:"Ravens",BUF:"Bills",CAR:"Panthers",CHI:"Bears",CIN:"Bengals",CLE:"Browns",DAL:"Cowboys",DEN:"Broncos",DET:"Lions",GB:"Packers",HOU:"Texans",IND:"Colts",JAX:"Jaguars",KC:"Chiefs",LA:"Rams",LAC:"Chargers",LV:"Raiders",MIA:"Dolphins",MIN:"Vikings",NE:"Patriots",NO:"Saints",NYG:"Giants",NYJ:"Jets",PHI:"Eagles",PIT:"Steelers",SEA:"Seahawks",SF:"49ers",TB:"Buccaneers",TEN:"Titans",WAS:"Commanders"};
 const EDGE_GAP = 12;
 const OFF = D.metric_defs.offense, DEF = D.metric_defs.defense;
+// Team logos: ESPN's images (the links nflverse publishes), fetched through
+// ESPN's resizer at 80px so a slate of tiles costs ~4 KB a logo, not ~40 KB.
+// If one fails to load it hides itself and the abbreviation still reads.
+const LOGO_FILE = {ARI:"ari",ATL:"atl",BAL:"bal",BUF:"buf",CAR:"car",CHI:"chi",CIN:"cin",CLE:"cle",DAL:"dal",DEN:"den",DET:"det",GB:"gb",HOU:"hou",IND:"ind",JAX:"jax",KC:"kc",LA:"lar",LAC:"lac",LV:"lv",MIA:"mia",MIN:"min",NE:"ne",NO:"no",NYG:"nyg",NYJ:"nyj",PHI:"phi",PIT:"pit",SEA:"sea",SF:"sf",TB:"tb",TEN:"ten",WAS:"wsh"};
+const LOGO_DARK = new Set(["CAR"]);   // nflverse points Carolina at ESPN's 500-dark folder
+const logo = t => LOGO_FILE[t] ? `<img class="tlogo" src="https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/${LOGO_DARK.has(t) ? "500-dark" : "500"}/${LOGO_FILE[t]}.png&amp;h=80&amp;w=80" alt="" width="40" height="40" loading="lazy" onerror="this.remove()">` : "";
+const teamsLine = g => `<span class="tl">${logo(g.away)}${g.away}</span><span class="at">@</span><span class="tl">${logo(g.home)}${g.home}</span>`;
 const app = document.getElementById("app");
 
 const store = {
@@ -390,6 +422,7 @@ const state = {
   tileExpanded: new Set(),
   gameTeam: null,
   depthSel: null,
+  pick: {},          // game id -> chosen bet on the Pick tab
 };
 const isResultsWeek = w => (D.results_weeks || []).some(x => x.week === w);
 const allWeekNums = () => [...D.weeks.map(w => w.week), ...(D.results_weeks || []).map(w => w.week)];
@@ -401,6 +434,8 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 const fmtDate = (iso, wd) => { const [y,m,d] = iso.split("-").map(Number); return `${wd}, ${MONTHS[m-1]} ${d}`; };
 const fmtKick = t => { if (!t) return ""; let [h,m] = t.split(":").map(Number); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return `${h}:${String(m).padStart(2,"0")} ${ap}`; };
 const minus = "−";
+// Data timestamps, in the viewer's own time zone (same as the header's "updated").
+const fmtStamp = iso => { if (!iso) return ""; const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString(undefined, {month:"short", day:"numeric", hour:"numeric", minute:"2-digit", timeZoneName:"short"}); };
 function spreadText(g){
   if (g.spread == null) return "No line";
   if (g.spread > 0) return `${g.home} ${minus}${g.spread}`;
@@ -472,12 +507,38 @@ function card(p){
   return `<div class="hcard ${p.x}">
     <div class="htop"><span><span class="who">${esc(p.n)}</span>${pill(p.x, p.rs)}</span><span class="role">${p.p} · ${p.st ? "starter" : "backup #" + p.r}</span></div>
     <div class="det">${esc([p.rs, p.inj].filter(Boolean).join(" · ") || "Limited in practice")}${p.pr ? ` · ${esc(p.pr.replace(" in Practice","").replace("Participation","practice"))}` : ""}</div>
+    ${p.og ? `<div class="origin ${p.og.k}">${esc(originText(p.og))}</div>` : ""}
+    ${p.fs ? `<div class="role">${esc(seenText(p))}</div>` : ""}
     ${shareBar(p.sh, "Snaps")}${p.sb ? `<div class="role">snap share from ${esc(p.sb)}</div>` : ""}
     ${p.rp ? `<div class="det">Next man up: <b>${esc(p.rp)}</b></div>${shareBar(p.rsh, "His snaps")}` : ""}
   </div>`;
 }
 function qtrLabel(qtr){
   return qtr == null ? "" : qtr <= 4 ? `Q${qtr}` : "OT";
+}
+/* Where an injury came from (queries.injury_origins). Only in-game injuries are
+   seen directly; the rest is inferred from when the player was first listed. */
+function gameHurtText(g){
+  const when = [qtrLabel(g.q), g.clk].filter(Boolean).join(" ");
+  return `Hurt in the Week ${g.wk} game vs ${g.opp}${when ? ` (${when})` : ""}, ${g.ret ? "returned to that game" : "did not return"}`;
+}
+function originText(og){
+  if (!og) return "";
+  if (og.k === "game")
+    return gameHurtText(og.g) + (og.since != null && og.since <= og.g.wk ? `. Already listed since Week ${og.since}` : "");
+  const start = og.k === "reserve" ? `On a reserve list since Week ${og.since}${og.since === 1 ? " or earlier" : ""}`
+    : og.k === "new" ? `First listed on the Week ${og.since} report`
+    : `On the injury report since Week ${og.since}${og.since === 1 ? " or earlier" : ""}`;
+  if (og.g) return `${start}. ${gameHurtText(og.g)}`;
+  if (!og.gb) return start;
+  return `${start}. Not charted as hurt in the Week ${og.gb.wk} game vs ${og.gb.opp}${og.k === "new" ? ", so likely a practice injury (or an illness, or a hit the charting missed)" : ""}`;
+}
+function seenText(p){
+  if (!p.fs) return "";
+  return p.fs0 ? `Listed this way since at least ${fmtStamp(p.fs)}` : `Status last changed ${fmtStamp(p.fs)}`;
+}
+function injSourceText(av){
+  return av?.inj_updated ? `nflverse injury data updated ${fmtStamp(av.inj_updated)}.` : "";
 }
 function hurtLastGameBlock(av){
   if (av.current || !av.hurt_last_game?.length) return "";
@@ -501,16 +562,19 @@ function availabilityPanel(t){
   const note = av.report_week == null ? "No injury report has been filed yet this season."
     : av.current ? `Week ${av.report_week} injury report.`
     : `The week ${av.week} injury report isn't out yet (teams file Wednesday to Friday). Showing week ${av.report_week}, so statuses may have changed.`;
+  // Short origin for the table rows: the full sentence lives in the title tooltip.
+  const ogCell = r => !r.og ? "" : `<span title="${esc([originText(r.og), seenText(r)].filter(Boolean).join(". "))}">${
+    r.og.k === "game" ? `Hurt Wk ${r.og.g.wk}${r.og.g.ret ? ", returned" : ", didn't return"}` : r.og.g ? `Hurt Wk ${r.og.g.wk}` : r.og.k === "new" ? `New Wk ${r.og.since}` : `Since Wk ${r.og.since}`}</span>`;
   const extra = (av.reserve.length ? `<details class="more"><summary>${av.reserve.length} more on reserve lists (not on the depth chart)</summary>
-      <div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Pos</th><th>List</th><th class="r">Snaps</th></tr></thead><tbody>
-      ${av.reserve.map(r => `<tr><td>${esc(r.player_name)}</td><td>${esc(r.position)}</td><td>${esc(r.list)}</td><td class="r num">${r.snap_share == null ? "–" : Math.round(r.snap_share*100) + "%"}</td></tr>`).join("")}
+      <div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Pos</th><th>List</th><th>When</th><th class="r">Snaps</th></tr></thead><tbody>
+      ${av.reserve.map(r => `<tr><td>${esc(r.player_name)}</td><td>${esc(r.position)}</td><td>${esc(r.list)}</td><td>${ogCell(r)}</td><td class="r num">${r.snap_share == null ? "–" : Math.round(r.snap_share*100) + "%"}</td></tr>`).join("")}
       </tbody></table></div></details>` : "")
     + (av.other.length ? `<details class="more"><summary>${av.other.length} more on the injury report</summary>
-      <div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Pos</th><th>Status</th><th>Injury</th><th class="r">Snaps</th></tr></thead><tbody>
-      ${av.other.map(r => `<tr><td>${esc(r.player_name)}</td><td>${esc(r.position)}</td><td>${esc(r.report_status || "Limited practice")}</td><td>${esc(r.injury || "")}</td><td class="r num">${r.snap_share == null ? "–" : Math.round(r.snap_share*100) + "%"}</td></tr>`).join("")}
+      <div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Pos</th><th>Status</th><th>Injury</th><th>When</th><th class="r">Snaps</th></tr></thead><tbody>
+      ${av.other.map(r => `<tr><td>${esc(r.player_name)}</td><td>${esc(r.position)}</td><td>${esc(r.report_status || "Limited practice")}</td><td>${esc(r.injury || "")}</td><td>${ogCell(r)}</td><td class="r num">${r.snap_share == null ? "–" : Math.round(r.snap_share*100) + "%"}</td></tr>`).join("")}
       </tbody></table></div></details>` : "");
   return `<div class="block"><h4>${t} ${NAMES[t] || ""}</h4>
-    <p class="notice">${esc(note)} Depth chart is this team's Week 1 lineup (set ${esc(av.snapshot)}), so you can see how much it's changed -- current status is layered on top of each opening-week slot, not swapped in for it.</p>
+    <p class="notice">${esc(note)} ${esc(injSourceText(av))} Depth chart is this team's Week 1 lineup (set ${esc(av.snapshot)}), so you can see how much it's changed -- current status is layered on top of each opening-week slot, not swapped in for it.</p>
     ${hurtLastGameBlock(av)}
     <h3 class="sec-h" style="margin-top:10px">Not fully available</h3>${hurtCards(av, false)}
     ${extra}
@@ -790,7 +854,13 @@ function weatherStrip(g, compact){
       if (w.precip != null) bits.push(`<span class="wx-i ${w.precip >= F.rain ? "warn" : ""}">${ICON.rain}${Math.round(w.precip)}% rain</span>`);
     }
   }
-  const note = w.flag ? `Weather flag: ${esc(w.flag)}` : w.src === "forecast" ? "Kickoff forecast" : w.src === "recorded" ? "Recorded at kickoff" : "";
+  // How old the forecast was when fetched, measured to the kickoff hour it describes.
+  let fresh = "";
+  if (w.src === "forecast" && w.at){
+    const lead = w.ko ? (new Date(w.ko + "Z") - new Date(w.at)) / 36e5 : null;
+    fresh = `updated ${fmtStamp(w.at)}${lead != null && lead > 0 ? `, ${lead < 48 ? Math.round(lead) + " h" : Math.round(lead / 24) + " days"} before kickoff` : ""}`;
+  }
+  const note = [w.flag ? `Weather flag: ${esc(w.flag)}` : w.src === "forecast" ? "Kickoff forecast" : w.src === "recorded" ? "Recorded at kickoff" : "", esc(fresh)].filter(Boolean).join(" · ");
   return `<div class="wx ${w.flag ? "flag" : ""} ${compact ? "compact" : ""}">${bits.join("")}${note ? `<span class="wx-note">${note}${g.stadium && !compact ? " · " + esc(g.stadium) : ""}</span>` : ""}</div>`;
 }
 const ICON = {
@@ -843,8 +913,17 @@ function finalStrip(g){
   return `<div class="final"><span class="num"><b>Final</b> ${g.away} ${f.away} – ${f.home} ${g.home}</span><span>${[cov, ou].filter(Boolean).join(" · ")}</span></div>`;
 }
 
-function condStat(rec){
-  return `<span class="num">${esc(rec ?? "–")}</span>`;
+// L3 records, colored by streak: blue = covers / overs, orange = misses / unders.
+// Solid when one side leads by 2+ (3-0, 2-0-1), tinted for a 1-game lean (2-1),
+// plain when even. Same colorblind-safe pair as the charts.
+function streakCls(rec){
+  const [a, b] = String(rec ?? "").split("-").map(Number);
+  if (isNaN(a) || isNaN(b) || a === b) return "";
+  return `${a > b ? "st-up" : "st-dn"} ${Math.abs(a - b) >= 2 ? "st-strong" : "st-lean"}`;
+}
+function condStat(rec, kind){
+  const word = kind === "ou" ? "over-under" : "against the spread";
+  return `<span class="num cstat ${streakCls(rec)}" title="${esc(rec ?? "")} ${word}, last 3 games">${esc(rec ?? "–")}</span>`;
 }
 function condensedStrip(g){
   // Last-3-games ATS and O/U records for both teams -- enough to scan a
@@ -852,8 +931,8 @@ function condensedStrip(g){
   // season-to-date row); see ENTRIES above.
   const ats3 = windowRows(g, "ats")[1], ou3 = windowRows(g, "ou")[1];
   return `<div class="cond-stats">
-    <div class="cond-row"><span class="cond-k">ATS L3</span>${condStat(ats3?.a?.rec)}<span class="cond-mid">·</span>${condStat(ats3?.h?.rec)}</div>
-    <div class="cond-row"><span class="cond-k">O/U L3</span>${condStat(ou3?.a?.rec)}<span class="cond-mid">·</span>${condStat(ou3?.h?.rec)}</div>
+    <div class="cond-row"><span class="cond-k">ATS L3</span>${condStat(ats3?.a?.rec, "ats")}<span class="cond-mid">·</span>${condStat(ats3?.h?.rec, "ats")}</div>
+    <div class="cond-row"><span class="cond-k">O/U L3</span>${condStat(ou3?.a?.rec, "ou")}<span class="cond-mid">·</span>${condStat(ou3?.h?.rec, "ou")}</div>
   </div>`;
 }
 
@@ -863,7 +942,7 @@ function gameTile(g){
   const when = `${(g.weekday || "").slice(0, 3)} ${fmtKick(g.time)} ET`;
   return `<article class="gtile ${expanded ? "" : "is-condensed"}" id="g-${g.id}">
     <a class="ghead" href="#game=${g.id}">
-      <span class="gteams">${g.away}<span class="at">@</span>${g.home}</span>
+      <span class="gteams">${teamsLine(g)}</span>
       <span class="gmeta"><span>${esc(when)}</span><span class="more-link">Details ›</span></span>
     </a>
     <div class="cond-line">
@@ -916,7 +995,7 @@ function resultTile(g){
     </div>`).join("") : "";
   return `<article class="gtile is-result">
     <div class="ghead">
-      <span class="gteams">${g.away}<span class="at">@</span>${g.home}</span>
+      <span class="gteams">${teamsLine(g)}</span>
       <span class="gmeta"><span>${(g.weekday || "").slice(0, 3)} ${esc(g.date.slice(5))}</span></span>
     </div>
     <div class="final"><span class="num"><b>Final</b> ${g.away} ${g.final.away} – ${g.final.home} ${g.home}</span>${g.stadium ? `<span>${esc(g.stadium)}</span>` : ""}</div>
@@ -944,8 +1023,7 @@ function renderResultsWeek(week){
 }
 
 function renderWeek(){
-  if (isResultsWeek(state.week)){ renderResultsWeek(state.week); return; }
-  const W = currentWeek();
+  // A game link wins over the remembered week, even if that was a results week.
   const route = parseRoute();
   if (route.game){
     const wk = D.weeks.find(w => w.games.some(x => x.id === route.game));
@@ -955,6 +1033,8 @@ function renderWeek(){
       return;
     }
   }
+  if (isResultsWeek(state.week)){ renderResultsWeek(state.week); return; }
+  const W = currentWeek();
   const played = W.games.filter(g => g.final).length;
   const byDay = [];
   for (const g of W.games){
@@ -974,9 +1054,10 @@ function renderWeek(){
       <p><b>The numbers</b> blend ${D.season - 1} and ${D.season}: this season counts for its games played ÷ 6. Each game only uses results from before its kickoff.</p>
       <p><b>Records</b>: ATS is wins-losses against the spread; O/U is overs-unders. The number after a record is the average margin: points the team beat (+) or missed (−) the spread by, or points its games went over (+) or under (−) the total. "Last 10" includes playoffs and last season.</p>
       <p><b>Points estimate</b> is the simple average of the two scoring rows, compared with the total. It isn't a model.</p>
-      <p><b>Weather</b> is the kickoff-hour forecast from Open-Meteo, refreshed with the board. A game is flagged at ${D.weather_flags?.wind ?? 15}+ mph wind or a ${D.weather_flags?.rain ?? 50}%+ chance of rain.</p>
-      <p><b>Details ›</b> opens the game page: game logs, roster and depth chart with injuries, and full ATS and O/U splits.</p>
-      <p>Tiles start condensed -- teams, kickoff, spread, and each team's last 3 games ATS and O/U. Tap <b>More ▼</b> for the full matchup breakdown.</p>
+      <p><b>Weather</b> is the kickoff-hour forecast from Open-Meteo, refreshed with the board. "Updated" is when it was fetched, and how far ahead of kickoff: forecasts a day out are far more reliable than ones a week out. A game is flagged at ${D.weather_flags?.wind ?? 15}+ mph wind or a ${D.weather_flags?.rain ?? 50}%+ chance of rain.</p>
+      <p><b>Details ›</b> opens the game page: game logs, an EPA matchup (total, pass and rush), roster and depth chart with injuries, and full ATS and O/U splits.</p>
+      <p><b>Injury timing</b>: tap a tagged player on the Roster tab. "Hurt in the Week 5 game" comes straight from the play-by-play, including whether he returned. Anything else is inferred from when he first appeared on a list. "First listed this week" without a game injury usually means practice, illness or a hit the charting missed. "Status last changed" is the board refresh that first saw his current listing, so it's only as precise as the refresh schedule. nflverse's own update time for the injury file is shown with each team.</p>
+      <p>Tiles start condensed -- teams, kickoff, spread, and each team's last 3 games ATS and O/U. Tap <b>More ▼</b> for the full matchup breakdown. The last-3 records are colored: <b>blue</b> for covers (ATS) or overs (O/U), <b>orange</b> for misses or unders. Solid means a 2+ game lead like 3-0, light means 2-1, plain means even. Three games is a tiny sample, so treat the colors as a pointer, not a signal.</p>
       <p>Next week's slate joins the board from Wednesday on; the week switcher above also holds every finished week's results once its games are done.</p>
       ${anyStale ? `<p>This week's injury reports aren't all out yet (teams file Wednesday to Friday), so some hurt-starter counts use last week's report.</p>` : ""}
       <p><b>Depth chart and injuries</b> is frozen to each team's Week 1 lineup, not today's reshuffled one -- so a Week 1 starter who's since been hurt, benched or has left the team entirely still shows in their opening slot, tagged with what's happened to them. That's on purpose: it's the easiest way to see how much a roster has actually been depleted since the season started. A <b>GONE</b> tag means the player is no longer on this team's roster at all (released, retired, or traded), which the injury report alone won't tell you.</p>
@@ -991,7 +1072,241 @@ function parseRoute(){
   const p = new URLSearchParams(location.hash.slice(1));
   return {game: p.get("game"), tab: p.get("tab") || "logs"};
 }
-const GTABS = [["logs", "Game logs"], ["roster", "Roster"], ["ats", "ATS"], ["ou", "O/U"]];
+const GTABS = [["logs", "Game logs"], ["matchup", "Matchup"], ["roster", "Roster"], ["ats", "ATS"], ["ou", "O/U"], ["pick", "Pick"]];
+
+/* ----------------------------------------------------------------------
+   Pick write-up: a 5-8 sentence case FOR one bet, built from numbers
+   already on this page, for pasting into a group chat. It argues one side
+   on purpose, so it only uses reasons that favor the chosen bet -- but every
+   number is the same one the board shows elsewhere, and a thin case says
+   so rather than stretching.
+   ---------------------------------------------------------------------- */
+const ord = n => { const s = ["th","st","nd","rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+const rkWords = r => r === 1 ? "best in the NFL" : r === 32 ? "worst in the NFL" : ord(r);
+const nick = t => `the ${NAMES[t] || t}`;
+const poss = t => `${nick(t)}'`;                        // every nickname ends in s
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const teamLine = (g, t) => g.spread == null ? null : (t === g.home ? g.spread : -g.spread);   // + = favored by
+const betLabel = (g, bet) => bet === "over" ? `Over ${g.total}` : bet === "under" ? `Under ${g.total}` : lineFor(g[bet], teamLine(g, g[bet]));
+// "On the road since 2023" -> "on the road since 2023", "Last 10 games" -> "over their last 10 games".
+const angleWords = a => a === `${D.season} season` ? "this season" : /^Last /.test(a) ? `over their ${a.toLowerCase()}`
+  : a.replace(/^All games /, "").replace(/^(.)/, c => c.toLowerCase());
+const recPct = rec => { const [w, l] = String(rec || "").split("-").map(Number); return w + l ? w / (w + l) : null; };
+
+function pickReasons(g, bet){
+  const W = currentWeek(), R = [];
+  const add = (score, key, text) => R.push({score, key, text});
+  const M = (t, k) => mv(t, k);
+  const hurtStarters = t => (W.avail?.[t]?.depth || []).filter(p => p.st && ["out", "doubtful"].includes(p.x));
+
+  if (bet === "away" || bet === "home"){
+    const T = g[bet], O = bet === "away" ? g.home : g.away;
+    // Total EPA mismatches, both directions.
+    const [toV, toR] = M(T, "off_epa"), [odV, odR] = M(O, "def_epa");
+    if (toR != null && odR != null && odR - toR >= 6)
+      add((odR - toR) / 31 + (toR <= 8 ? 0.3 : 0), "off", `${cap(poss(T))} offense is producing ${toV} EPA per play (${rkWords(toR)}), and it draws ${poss(O)} defense, ${rkWords(odR)} in EPA allowed at ${odV}.`);
+    const [tdV, tdR] = M(T, "def_epa"), [ooV, ooR] = M(O, "off_epa");
+    if (tdR != null && ooR != null && ooR - tdR >= 6)
+      add((ooR - tdR) / 31 + (tdR <= 8 ? 0.3 : 0), "def", `${cap(poss(T))} defense allows just ${tdV} EPA per play (${rkWords(tdR)}) against ${poss(O)} offense, which ranks ${rkWords(ooR)} at ${ooV}.`);
+    // The single biggest pass or rush mismatch.
+    let best = null;
+    for (const [kind, word] of [["pass", "through the air"], ["rush", "on the ground"]]){
+      const a = M(T, `off_${kind}_epa`), b = M(O, `def_${kind}_epa`), c = M(T, `def_${kind}_epa`), d = M(O, `off_${kind}_epa`);
+      if (a[1] != null && b[1] != null && a[1] <= 16 && b[1] - a[1] >= 10 && (!best || b[1] - a[1] > best.gap))
+        best = {gap: b[1] - a[1], side: "off", text: `The clearest edge is ${word}: ${nick(T)} rank ${rkWords(a[1])} in ${kind} EPA (${a[0]}), and ${nick(O)} are ${rkWords(b[1])} defending it (${b[0]}).`};
+      if (c[1] != null && d[1] != null && c[1] <= 16 && d[1] - c[1] >= 10 && (!best || d[1] - c[1] > best.gap))
+        best = {gap: d[1] - c[1], side: "def", text: `The clearest edge is ${word}: ${poss(T)} defense ranks ${rkWords(c[1])} against the ${kind} (${c[0]} EPA allowed), while ${poss(O)} ${kind === "pass" ? "passing game" : "run game"} ranks ${rkWords(d[1])} (${d[0]}).`};
+    }
+    if (best) add(best.gap / 31 + 0.1, best.side === "def" ? "split_def" : "split_off", best.text);
+    // Scoring.
+    const [pV, pR] = M(T, "off_ppg"), [paV, paR] = M(O, "def_ppg");
+    if (pR != null && paR != null && paR - pR >= 8)
+      add((paR - pR) / 40, "pts", `${cap(nick(T))} score ${pV} points a game (${rkWords(pR)}); ${nick(O)} give up ${paV} (${rkWords(paR)}).`);
+    // ATS form: the most convincing window for T that fits this game.
+    const angles = g.trends?.[bet]?.angles || [];
+    const good = angles.filter(a => a.n >= 5 && a.pct >= 58 && (a.this_game || /season|Last 10/.test(a.angle)))
+      .sort((a, b) => (b.pct - a.pct) || (b.n - a.n))[0];
+    if (good) add(0.2 + (good.pct - 50) / 100 + (good.sig ? 0.3 : 0), "ats",
+      `${cap(nick(T))} are ${good.record} against the spread ${angleWords(good.angle)}, covering by ${Math.abs(good.avg_margin ?? 0).toFixed(1)} points a game on average.`);
+    const oppAngles = g.trends?.[bet === "away" ? "home" : "away"]?.angles || [];
+    const bad = oppAngles.filter(a => a.n >= 3 && a.pct != null && a.pct <= 40 && /season|Last 5|Last 10/.test(a.angle))
+      .sort((a, b) => a.pct - b.pct)[0];
+    if (bad) add(0.2 + (50 - bad.pct) / 120, "oppats",
+      `${cap(nick(O))}, meanwhile, are just ${bad.record} ATS ${angleWords(bad.angle)}.`);
+    // Injuries: starters out or doubtful on the other side.
+    const oh = hurtStarters(O), th = hurtStarters(T);
+    if (oh.length > th.length){
+      const qb = oh.find(p => p.p === "QB");
+      const named = (qb ? [qb] : []).concat(oh.filter(p => p !== qb)).slice(0, 2).map(p => `${p.p} ${p.n}`);
+      add((qb ? 0.9 : 0.25) + 0.08 * (oh.length - th.length), "inj",
+        `Health is a factor: ${nick(O)} have ${oh.length} starter${oh.length === 1 ? "" : "s"} out or doubtful, including ${named.join(" and ")}${th.length ? `, against ${th.length} for ${nick(T)}` : `, while ${nick(T)} have none`}.`);
+    }
+    // Power ratings: only when they side with the pick.
+    const m = g.model;
+    if (m && m.side === T && Math.abs(m.spread_edge ?? 0) >= 0.5)
+      add(0.15 + Math.min(Math.abs(m.spread_edge), 6) / 20, "model",
+        `The board's power ratings make it ${modelSpread(g, m.model_margin)}, ${Math.abs(m.spread_edge).toFixed(1)} points better for ${nick(T)} than the line.`);
+    // Luck: the opponent's record outrunning its points, or T's lagging.
+    const lo = W.luck?.[O], lt = W.luck?.[T];
+    if (lo && lo.games >= 4 && lo.luck >= 0.8)
+      add(0.2 + lo.luck / 10, "luck", `${cap(poss(O))} ${lo.record} record flatters them: by points scored and allowed they play like a ${lo.pythag.toFixed(1)}-win team.`);
+    else if (lt && lt.games >= 4 && lt.luck <= -0.8)
+      add(0.2 - lt.luck / 10, "luck", `${cap(poss(T))} ${lt.record} record undersells them: by points scored and allowed they play like a ${lt.pythag.toFixed(1)}-win team.`);
+    const tr = g[`${bet}_rest`], or = g[`${bet === "away" ? "home" : "away"}_rest`];
+    if (tr != null && or != null && tr - or >= 3)
+      add(0.15, "rest", `${cap(nick(T))} also have the rest edge, ${tr} days to ${or}.`);
+  } else {
+    const over = bet === "over", a = g.away, h = g.home;
+    const f = s => parseFloat(String(s ?? "").replace(minus, "-"));
+    const v = [f(M(a, "off_ppg")[0]), f(M(h, "def_ppg")[0]), f(M(h, "off_ppg")[0]), f(M(a, "def_ppg")[0])];
+    if (g.total != null && v.every(x => !isNaN(x))){
+      const est = (v[0] + v[1]) / 2 + (v[2] + v[3]) / 2, diff = est - g.total;
+      if (over ? diff >= 1 : diff <= -1)
+        add(0.3 + Math.min(Math.abs(diff), 8) / 12, "est", `Average each offense's scoring with what the other defense allows and you get ${est.toFixed(1)} points, ${Math.abs(diff).toFixed(1)} ${over ? "above" : "below"} the ${g.total} total.`);
+    }
+    // Offenses vs defenses by EPA.
+    const r = k => [M(a, k)[1], M(h, k)[1]];
+    const [ao, ho] = r("off_epa"), [ad, hd] = r("def_epa");
+    if ([ao, ho, ad, hd].every(x => x != null)){
+      const offAvg = (ao + ho) / 2, defAvg = (ad + hd) / 2;
+      if (over && offAvg <= 13) add(0.2 + (16 - offAvg) / 30, "offs", `Both offenses can move it: ${nick(a)} rank ${rkWords(ao)} and ${nick(h)} ${rkWords(ho)} in EPA per play.`);
+      if (over && defAvg >= 19) add(0.2 + (defAvg - 16) / 30, "defs", `Neither defense is a wall: ${nick(a)} rank ${rkWords(ad)} and ${nick(h)} ${rkWords(hd)} in EPA allowed.`);
+      if (!over && defAvg <= 13) add(0.2 + (16 - defAvg) / 30, "defs", `These are two good defenses: ${nick(a)} rank ${rkWords(ad)} and ${nick(h)} ${rkWords(hd)} in EPA allowed per play.`);
+      if (!over && offAvg >= 19) add(0.2 + (offAvg - 16) / 30, "offs", `Neither offense is scaring anyone: ${nick(a)} rank ${rkWords(ao)} and ${nick(h)} ${rkWords(ho)} in EPA per play.`);
+    }
+    // Pace.
+    const [ap, hp] = r("pace_plays");
+    if (ap != null && hp != null){
+      const avg = (ap + hp) / 2;
+      if (over && avg <= 12) add(0.2 + (16 - avg) / 40, "pace", `Pace helps: ${nick(a)} run ${M(a, "pace_plays")[0]} plays a game (${ord(ap)} most) and ${nick(h)} ${M(h, "pace_plays")[0]} (${ord(hp)}), and more snaps means more scoring chances.`);
+      if (!over && avg >= 21) add(0.2 + (avg - 16) / 40, "pace", `Neither team plays fast: ${nick(a)} run ${M(a, "pace_plays")[0]} plays a game (${ord(ap)} most) and ${nick(h)} ${M(h, "pace_plays")[0]} (${ord(hp)}), which keeps possessions down.`);
+    }
+    // Explosive plays.
+    const [ae, he] = r("off_explosive");
+    if (over && ae != null && he != null && (ae + he) / 2 <= 12)
+      add(0.18, "expl", `Both offenses hit big plays: ${M(a, "off_explosive")[0]} of ${poss(a)} snaps (${ord(ae)}) and ${M(h, "off_explosive")[0]} of ${poss(h)} (${ord(he)}) gain 20+ yards through the air or 10+ on the ground.`);
+    // O/U form for each team.
+    const form = side => (g.trends?.[side]?.angles || []).find(x => x.angle === "Last 5 games" || x.angle === `${D.season} season`);
+    const fa = form("away"), fh = form("home");
+    const leans = x => { const p = recPct(x?.ou_record); return p == null ? null : over ? p : 1 - p; };
+    const ouCount = x => { const [o, u] = String(x.ou_record).split("-").map(Number); return `${over ? o : u} of ${o + u}`; };
+    if (fa && fh && leans(fa) >= 0.6 && leans(fh) >= 0.6)
+      add(0.25, "ouform", `Both teams have been trending this way: ${poss(a)} games have gone ${over ? "over" : "under"} in ${ouCount(fa)} ${fa.angle === `${D.season} season` ? "this season" : "lately"}, ${poss(h)} in ${ouCount(fh)}.`);
+    // Weather.
+    const w = g.wx || {};
+    if (over && (w.roof === "dome" || (w.src === "forecast" && (w.wind ?? 0) < 10 && (w.precip ?? 0) < 30)))
+      add(0.12, "wx", w.roof === "dome" ? "It's indoors, so the weather won't slow anyone down." : `The forecast is friendly, ${Math.round(w.wind)} mph wind and ${Math.round(w.precip ?? 0)}% chance of rain.`);
+    if (!over && w.src === "forecast" && ((w.wind ?? 0) >= 15 || (w.precip ?? 0) >= 50))
+      add(0.45, "wx", `The weather should help: the kickoff forecast calls for ${Math.round(w.wind)} mph wind${w.gust ? ` (gusts to ${Math.round(w.gust)})` : ""} and a ${Math.round(w.precip ?? 0)}% chance of rain.`);
+    // Power ratings.
+    const m = g.model;
+    if (m && m.lean === (over ? "Over" : "Under") && Math.abs(m.total_edge ?? 0) >= 1)
+      add(0.15 + Math.min(Math.abs(m.total_edge), 8) / 25, "model", `The board's power ratings project ${m.model_total.toFixed(1)} points, ${Math.abs(m.total_edge).toFixed(1)} ${over ? "over" : "under"} the market.`);
+    // Injuries: hurt defensive starters help the over, a hurt QB helps the under.
+    const hurt = (t, side) => hurtStarters(t).filter(p => p.s === side);
+    if (over){
+      const dh = [...hurt(a, "D"), ...hurt(h, "D")];
+      if (dh.length >= 2) add(0.15 + 0.05 * dh.length, "inj", `Injuries favor the offenses: ${dh.length} defensive starters are out or doubtful, including ${dh.slice(0, 2).map(p => `${p.p} ${p.n}`).join(" and ")}.`);
+    } else {
+      const qbs = [...hurt(a, "O"), ...hurt(h, "O")].filter(p => p.p === "QB");
+      if (qbs.length) add(0.6, "inj", `Quarterback health is a problem: ${qbs.map(p => p.n).join(" and ")} ${qbs.length > 1 ? "are" : "is"} out or doubtful.`);
+    }
+  }
+  return R.sort((x, y) => y.score - x.score);
+}
+
+// Smaller edges (any rank advantage), used only when the strong list is thin.
+const MILD_SPREAD = [["off_epa", "def_epa", "EPA per play"], ["off_success", "def_success", "success rate"],
+  ["off_third", "def_third", "third-down rate"], ["off_rz_td", "def_rz_td", "red-zone touchdown rate"],
+  ["off_ppg", "def_ppg", "scoring"], ["off_explosive", "def_explosive", "explosive-play rate"]];
+function mildReasons(g, bet, taken){
+  const R = [];
+  if (bet === "away" || bet === "home"){
+    const T = g[bet], O = bet === "away" ? g.home : g.away;
+    for (const [ok, dk, word] of MILD_SPREAD){
+      const [tv, tr] = mv(T, ok), [ov, or] = mv(O, dk);
+      if (tr != null && or != null && or > tr && !taken.has(ok))
+        R.push({score: (or - tr) / 31, key: "mild", text: `${cap(nick(T))} hold an edge in ${word}: their offense ranks ${ord(tr)} (${tv}) against a defense that ranks ${ord(or)} (${ov}).`});
+      const [tdv, tdr] = mv(T, dk), [oov, oor] = mv(O, ok);
+      if (tdr != null && oor != null && oor > tdr && !taken.has(dk))
+        R.push({score: (oor - tdr) / 31, key: "mild", text: `On defense, ${nick(T)} rank ${ord(tdr)} in ${word} allowed (${tdv}), ${nick(O)} ${ord(oor)} on offense (${oov}).`});
+    }
+  } else {
+    // One combined sentence: every offensive stat where the two teams' average rank leans this way.
+    const over = bet === "over", parts = [];
+    for (const [k, word] of [["off_epa", "EPA per play"], ["off_ppg", "scoring"], ["off_explosive", "explosive plays"], ["off_rz_td", "red-zone touchdown rate"]]){
+      const ra = mv(g.away, k)[1], rh = mv(g.home, k)[1];
+      if (ra != null && rh != null && (over ? (ra + rh) / 2 < 16.5 : (ra + rh) / 2 > 16.5)) parts.push(`${word} (${ord(ra)} and ${ord(rh)})`);
+    }
+    if (parts.length)
+      R.push({score: 0.1, key: "mild", text: `Between them, ${nick(g.away)} and ${nick(g.home)} average a ${over ? "top" : "bottom"}-half offensive rank in ${parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] : parts[0]}.`});
+  }
+  return R.sort((x, y) => y.score - x.score);
+}
+
+function pickParagraph(g, bet){
+  const pick = betLabel(g, bet);
+  const strong = pickReasons(g, bet).slice(0, 5);
+  const keysUsed = new Set(strong.map(r => r.key === "off" ? "off_epa" : r.key === "def" ? "def_epa" : r.key === "pts" ? "off_ppg" : r.key));
+  const reasons = strong.length >= 3 ? strong : strong.concat(mildReasons(g, bet, keysUsed).slice(0, 3 - strong.length));
+  const when = `${g.weekday}${g.time && +g.time.split(":")[0] >= 19 ? " night" : ""}`;
+  const where = `${g.away} at ${g.home}`;
+  let open, frame;
+  if (bet === "over" || bet === "under"){
+    open = `My pick this week: ${pick} in ${where} on ${when}.`;
+    frame = !strong.length ? `The numbers don't scream ${bet}, but the small edges lean that way.`
+      : bet === "over" ? "I think this one turns into a shootout, and the numbers back it up." : "I see a grind-it-out game here, and the numbers point the same way.";
+  } else {
+    const T = g[bet], line = teamLine(g, T);
+    open = `My pick this week: ${pick}${line > 0 ? ` ${bet === "away" ? "on the road" : "at home"}` : line < 0 ? ` as ${bet === "away" ? "road" : "home"} underdogs` : ""} on ${when}.`;
+    const top = reasons[0]?.key;
+    frame = top === "def" || top === "split_def" ? `This game is about ${poss(T)} defense, and I trust it to win the matchup.`
+      : top === "off" || top === "split_off" ? `${cap(nick(T))} have the matchup they want on offense, and I don't think ${nick(bet === "away" ? g.home : g.away)} can take it away.`
+      : top === "inj" ? `The injury report tells most of the story here.`
+      : top === "ats" || top === "oppats" ? `${cap(nick(T))} keep finding ways to beat this kind of number, and the form lines up.`
+      : !strong.length ? `On paper this one is close, so I'm backing the side the smaller numbers lean toward.`
+      : `${line > 0 ? "The market has the right favorite, but not by enough." : "The market is giving me points on the better-performing team."}`;
+  }
+  const body = reasons.map((r, i) => r.key === "def" && reasons.slice(0, i).some(x => x.key === "off")
+    ? "On the other side, " + r.text.charAt(0).toLowerCase() + r.text.slice(1) : r.text);
+  if (strong.length < 3) body.push("It isn't a lopsided matchup on paper, so this is as much about the number as the teams.");
+  return [open, frame, ...body, `Give me ${pick}.`].join(" ");
+}
+
+function pickPane(g){
+  const bets = [["away", `${NAMES[g.away] || g.away} spread`], ["home", `${NAMES[g.home] || g.home} spread`], ["over", "Over"], ["under", "Under"]]
+    .filter(([b]) => (b === "over" || b === "under") ? g.total != null : g.spread != null);
+  if (!bets.length) return `<div class="card"><p class="meta">No line posted for this game yet.</p></div>`;
+  const sel = bets.some(([b]) => b === state.pick?.[g.id]) ? state.pick[g.id] : bets[0][0];
+  const text = pickParagraph(g, sel);
+  return `<div class="card pick">
+    <h4>Make a pick</h4>
+    <label class="pick-l" for="pick-${g.id}">Bet</label>
+    <select id="pick-${g.id}" class="pick-sel" data-pick="${g.id}">
+      ${bets.map(([b, l]) => `<option value="${b}" ${b === sel ? "selected" : ""}>${esc(l)} · ${esc(betLabel(g, b))}</option>`).join("")}
+    </select>
+    <p class="pick-text" id="pick-text">${esc(text)}</p>
+    <div class="pick-actions"><button type="button" class="pick-copy" data-copy="pick-text">Copy</button><span class="soft" id="pick-copied" aria-live="polite"></span></div>
+    <p class="meta">Built from the numbers on this page, using only the ones that favor this bet. It's an argument for your pick, not a prediction. Line: ${esc(betLabel(g, sel))}${D.lines_live && g.lineBook ? ` (${esc(g.lineBook)}, ${esc(fmtStamp(D.lines_at))})` : " (nflverse, as of the last scheduled refresh)"}.</p>
+  </div>`;
+}
+
+/* EPA per play, total first, then the same plays split into passes and runs.
+   Each side's total is the play-weighted mix of its two splits. */
+const EPA_SPLITS = [["epa", "EPA / play", "all plays"], ["pass_epa", "Pass plays", "incl. sacks, scrambles"], ["rush_epa", "Rush plays", "designed runs"]];
+function epaBlock(off, def){
+  return `<h5>${off} offense vs ${def} defense</h5>
+    <div class="mhead"><span><b>${off}</b> offense</span><span></span><span>defense <b>${def}</b></span></div>
+    ${EPA_SPLITS.map(([k, label, sub], i) => `<div class="mrow ${i ? "sub" : ""}">${cellL(mv(off, "off_" + k))}${mid(label, sub)}${cellR(mv(def, "def_" + k))}</div>`).join("")}`;
+}
+function matchupPane(g){
+  return `<div class="card mt">
+    <h4>EPA per play</h4>
+    <p class="meta tight">Total, then split into pass and rush plays. Ranks: #1 is best on both sides of the ball.</p>
+    ${epaBlock(g.away, g.home)}${epaBlock(g.home, g.away)}
+    <p class="meta">EPA (expected points added) measures how much each play changed a team's expected points. Offense: higher is better. Defense: lower allowed is better. Within a season, a team's total is the play-weighted mix of its pass and rush numbers, so a pass-heavy team's total leans toward its pass EPA. Every number here blends this season with last, so the total can sit a hair outside the two splits.<br>${[g.away, g.home].map(t => `${t}: ${esc(currentWeek().metrics?.[t]?.note ?? "no data")}`).join("<br>")}</p>
+  </div>`;
+}
 
 function teamSwitch(g, team){
   return `<div class="sw" role="group" aria-label="Team">
@@ -1069,6 +1384,8 @@ function depthGrid(t, side){
     const tagWord = selP.x === "out" ? (selP.rs || "Out") : TAG_TEXT[selP.x];
     return `<div class="dsel ${selP.x}"><div class="dsel-h"><b>${esc(selP.n)} <small class="num">${esc(selP.p)} · ${selDepth}</small></b><span class="tagword">${esc(tagWord)}</span></div>
       <div>${bits.join(" · ") || "No other details on the report."}</div>
+      ${selP.og ? `<div class="origin ${selP.og.k}">${esc(originText(selP.og))}</div>` : ""}
+      ${selP.fs ? `<div class="soft">${esc(seenText(selP))}</div>` : ""}
       <button type="button" class="linkish" data-dsel="">Close</button></div>`;
   })() : "";
   return `<div class="card flush">
@@ -1105,7 +1422,7 @@ function rosterPane(t){
     : av.current ? `Week ${av.report_week} injury report.`
     : `The week ${av.week} injury report isn't out yet (teams file Wednesday to Friday), so tags come from week ${av.report_week}.`;
   return `${changesBox(t)}${av ? hurtLastGameBlock(av) : ""}${depthGrid(t, "O")}${depthGrid(t, "D")}
-    <p class="meta">${note} Tags: Q questionable, D doubtful, OUT, IR injured reserve, PUP / NFI other reserve lists, RES other reserve list, LP limited practice, GONE no longer on this team's roster. Slots are frozen to this team's Week 1 depth chart (${esc(av?.snapshot || "")}) so you can see how far it's been depleted; current status is overlaid on each slot.</p>`;
+    <p class="meta">${note} ${esc(injSourceText(av))} Tags: Q questionable, D doubtful, OUT, IR injured reserve, PUP / NFI other reserve lists, RES other reserve list, LP limited practice, GONE no longer on this team's roster. Slots are frozen to this team's Week 1 depth chart (${esc(av?.snapshot || "")}) so you can see how far it's been depleted; current status is overlaid on each slot.</p>`;
 }
 function splitCell(x, right){
   if (!x || !x.n) return `<span class="c ${right ? "r" : "l"} stack2"><span class="num">–</span><small class="soft">no games</small></span>`;
@@ -1155,13 +1472,15 @@ function renderGame(g, tab){
   const team = state.gameTeam;
   const when = `${fmtDate(g.date, g.weekday)} · ${fmtKick(g.time)} ET`;
   const pane = tab === "logs" ? teamSwitch(g, team) + logsPane(team)
+    : tab === "matchup" ? matchupPane(g)
+    : tab === "pick" ? pickPane(g)
     : tab === "roster" ? teamSwitch(g, team) + rosterPane(team)
     : splitsPane(g, tab);
   app.innerHTML = `<div class="gpage">
     <div class="ghero">
       <div class="ghero-top"><a href="#" class="back">‹ Week ${currentWeek().week}</a><span>${esc(when)}</span></div>
       <div class="ghero-main">
-        <div><h2>${g.away}<span class="at">@</span>${g.home}</h2><p>${TEAM_FULL(g.away)} at ${TEAM_FULL(g.home)}${g.stadium ? " · " + esc(g.stadium) : ""}</p></div>
+        <div><h2>${teamsLine(g)}</h2><p>${TEAM_FULL(g.away)} at ${TEAM_FULL(g.home)}${g.stadium ? " · " + esc(g.stadium) : ""}</p></div>
         <div class="chips2"><div class="chipbox hot"><small>SPREAD</small><b class="num">${esc(spreadText(g))}</b></div><div class="chipbox"><small>O/U</small><b class="num">${g.total ?? "–"}</b></div></div>
       </div>
       ${finalStrip(g)}
@@ -1187,7 +1506,9 @@ function renderTeams(){
   const metricRows = (defs) => defs.map(([k, label, hb]) => {
     const [v, r] = M?.v?.[k] || [null, null];
     const pos = r == null ? null : ((r - 1) / 31) * 100;
-    return `<tr><td>${esc(label)}</td><td class="r num">${esc(v ?? "–")}</td><td class="r">${rk(r)}</td>
+    // Pass and rush EPA sit indented under the total EPA row they split.
+    const sub = /_(pass|rush)_epa$/.test(k);
+    return `<tr class="${sub ? "t-sub" : ""}"><td>${sub ? (k.includes("pass") ? "Pass plays" : "Rush plays") : esc(label)}</td><td class="r num">${esc(v ?? "–")}</td><td class="r">${rk(r)}</td>
       <td style="width:28%"><div class="bar" title="#1 on the left, #32 on the right">${pos == null ? "" : `<i style="left:${pos}%"></i>`}</div></td></tr>`;
   }).join("");
   const tile = (k, r, extra) => `<div class="tile"><div class="k">${k}</div><div class="v">${r?.n ? esc(r.record) : "–"}</div><div class="s">${r?.n ? `${extra ?? r.pct + "%"} · n=${r.n} · ±${r.moe}` : "no games"}${r?.sig ? ' <span class="sig">signal</span>' : ""}</div></div>`;
@@ -1230,13 +1551,118 @@ function render(){
 document.getElementById("stamp").textContent =
   `${D.season} · results through ${new Date(D.results_through + "T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"})} · updated ${new Date(D.generated).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}`;
 
+/* ----------------------------------------------------------------------
+   Live lines: the refresh button asks the Cloudflare Worker (worker/odds.js)
+   for current sportsbook spreads and totals, and swaps them in for every
+   upcoming game. It shows D.odds_book's line (config.ODDS_BOOK); a game that
+   book hasn't posted falls back to the line the most books are dealing
+   (ties go to the line nearest the median). The model gap is recomputed
+   against the new line exactly as queries.model_lines does it:
+   gap = model - market, + = home / over.
+   Nothing else is recomputed -- stats, trends and injuries stay as of the
+   last scheduled refresh.
+   ---------------------------------------------------------------------- */
+function consensus(vals){
+  const v = vals.filter(x => typeof x === "number").sort((a, b) => a - b);
+  if (!v.length) return null;
+  const med = v[Math.floor((v.length - 1) / 2)] / 2 + v[Math.ceil((v.length - 1) / 2)] / 2;
+  const count = new Map(); v.forEach(x => count.set(x, (count.get(x) || 0) + 1));
+  return [...count].sort((a, b) => (b[1] - a[1]) || (Math.abs(a[0] - med) - Math.abs(b[0] - med)))[0][0];
+}
+const kickoffMs = g => new Date(`${g.date}T${g.time || "13:00"}:00-04:00`).getTime();   // ET; an hour off in Nov-Jan is fine for matching
+function matchEvent(g, events){
+  const n = t => (NAMES[t] || t).toLowerCase();
+  return events.find(e => e.home.toLowerCase().endsWith(n(g.home)) && e.away.toLowerCase().endsWith(n(g.away))
+    && Math.abs(new Date(e.commence) - kickoffMs(g)) < 36 * 3600e3);
+}
+function applyLines(data){
+  let n = 0;
+  for (const W of D.weeks) for (const g of W.games){
+    if (g.final) continue;
+    const e = matchEvent(g, data.events || []);
+    if (!e) continue;
+    const pref = e.books.find(b => b.book === D.odds_book);
+    const homePt = pref?.home_pt ?? consensus(e.books.map(b => b.home_pt));
+    const total = pref?.total ?? consensus(e.books.map(b => b.total));
+    g.lineBook = pref?.home_pt != null ? D.odds_book : "most books";
+    if (homePt != null) g.spread = homePt === 0 ? 0 : -homePt;      // Odds API: home team's own number; board: + = home favored
+    if (total != null) g.total = total;
+    g.books = e.books.filter(b => b.home_pt != null || b.total != null).length;
+    const m = g.model;
+    if (m){
+      if (homePt != null){
+        m.market_margin = g.spread; m.spread_edge = Math.round((m.model_margin - g.spread) * 10) / 10;
+        m.side = Math.abs(m.model_margin - g.spread) < 0.05 ? null : (m.model_margin > g.spread ? g.home : g.away);
+      }
+      if (total != null){
+        m.market_total = g.total; m.total_edge = Math.round((m.model_total - g.total) * 10) / 10;
+        m.lean = Math.abs(m.model_total - g.total) < 0.05 ? null : (m.model_total > g.total ? "Over" : "Under");
+      }
+    }
+    n++;
+  }
+  D.lines_at = data.fetched_at; D.lines_live = true;
+  return n;
+}
+function linesStampText(data, n){
+  const fallback = D.weeks.flatMap(w => w.games).filter(g => g.lineBook === "most books").length;
+  return `${D.odds_book || "live"} lines, ${fmtStamp(data.fetched_at)}${fallback ? ` (${fallback} game${fallback > 1 ? "s" : ""} from most books)` : ""}${n ? "" : " (no games matched)"}${data.note ? " · " + data.note : ""}`;
+}
+async function refreshLines(){
+  const btn = document.getElementById("refresh"), out = document.getElementById("lines-stamp");
+  btn.classList.add("busy"); btn.disabled = true;
+  try {
+    const r = await fetch(D.odds_url.replace(/\/$/, "") + "/odds", {cache: "no-store"});
+    const data = await r.json();
+    if (!r.ok || !data.events) throw new Error(data.error || `status ${r.status}`);
+    const n = applyLines(data);
+    out.textContent = linesStampText(data, n);
+    store.set("lines", data);
+    const y = window.scrollY; render(); window.scrollTo(0, y);
+  } catch (err){
+    out.textContent = `Couldn't refresh lines (${err.message}).`;
+  } finally {
+    btn.classList.remove("busy"); btn.disabled = false;
+  }
+}
+if (D.odds_url){
+  const btn = document.getElementById("refresh");
+  btn.hidden = false;
+  btn.addEventListener("click", refreshLines);
+  // Reuse this viewer's last pull if it's newer than the build and under 12 hours old.
+  const saved = store.get("lines", null);
+  if (saved?.fetched_at && new Date(saved.fetched_at) > new Date(D.generated) && Date.now() - new Date(saved.fetched_at) < 12 * 3600e3){
+    const n = applyLines(saved);
+    document.getElementById("lines-stamp").textContent = linesStampText(saved, n);
+  }
+}
+
 document.querySelector(".top .seg").addEventListener("click", e => {
   const b = e.target.closest("button[data-view]"); if (!b) return;
   state.view = b.dataset.view; store.set("view", state.view);
   if (location.hash) history.replaceState(null, "", location.pathname + location.search);
   render(); window.scrollTo(0, 0);
 });
+app.addEventListener("change", e => {
+  const ps = e.target.closest("select[data-pick]");
+  if (ps){ state.pick[ps.dataset.pick] = ps.value; const y = window.scrollY; render(); window.scrollTo(0, y); document.getElementById(ps.id)?.focus(); }
+});
 app.addEventListener("click", e => {
+  const cp = e.target.closest("button[data-copy]");
+  if (cp){
+    const el = document.getElementById(cp.dataset.copy), text = el?.textContent || "";
+    const done = ok => { const m = document.getElementById("pick-copied"); if (m) m.textContent = ok ? "Copied" : "Selected: press copy on your keyboard or phone"; };
+    // Fallback when the Clipboard API is missing or blocked: select the paragraph
+    // and try the older copy command, so at worst the text is already highlighted.
+    const fallback = () => {
+      const r = document.createRange(); r.selectNodeContents(el); getSelection().removeAllRanges(); getSelection().addRange(r);
+      let ok = false; try { ok = document.execCommand("copy"); } catch {}
+      done(ok);
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => done(true), fallback);
+    else fallback();
+    return;
+  }
   const tv = e.target.closest("button[data-tile]");
   if (tv){
     state.tileView[tv.dataset.tile] = tv.dataset.v;

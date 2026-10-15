@@ -21,7 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 import queries
-from config import CURRENT_SEASON, PROJECT_ROOT, WIND_FLAG_MPH, RAIN_FLAG_PCT, CHART_SINCE_SEASON
+from config import CURRENT_SEASON, PROJECT_ROOT, WIND_FLAG_MPH, RAIN_FLAG_PCT, CHART_SINCE_SEASON, ODDS_RELAY_URL, ODDS_BOOK
 
 THROUGH = CURRENT_SEASON - 1   # ATS splits use completed seasons only
 N_SEASONS = 3
@@ -118,6 +118,15 @@ def recent_payload(df: pd.DataFrame) -> list:
     } for r in df.to_dict("records")]
 
 
+def origin_payload(r: dict) -> dict:
+    """Injury origin + when the board first saw the listing (see queries.injury_origins)."""
+    o = r.get("origin")
+    out = {"og": o if isinstance(o, dict) else None, "fs": text(r.get("first_seen"))}
+    if out["fs"] is not None:
+        out["fs0"] = bool(r.get("seen_at_start"))
+    return out
+
+
 def availability_payload(av: dict) -> dict:
     def share(x):
         return None if x is None or pd.isna(x) else round(float(x), 3)
@@ -132,11 +141,11 @@ def availability_payload(av: dict) -> dict:
             row.update({"rs": text(r["report_status"]), "inj": text(r["injury"]),
                         "pr": text(r["practice_status"]), "sh": share(r["snap_share"]),
                         "sb": text(r["snap_basis"]), "rp": text(r["replacement"]),
-                        "rsh": share(r["replacement_share"])})
+                        "rsh": share(r["replacement_share"]), **origin_payload(r)})
         depth.append(row)
     def plain(df, cols):
         return [] if df.empty else [
-            {c: (share(r[c]) if c == "snap_share" else text(r[c])) for c in cols}
+            {**{c: (share(r[c]) if c == "snap_share" else text(r[c])) for c in cols}, **origin_payload(r)}
             for r in df.to_dict("records")]
     hurt_last = av.get("hurt_last_game")
     hurt_last_game = [] if hurt_last is None or hurt_last.empty else [
@@ -157,6 +166,9 @@ def availability_payload(av: dict) -> dict:
                                               "injury", "practice_status", "snap_share", "snap_basis"]),
         "hurt_last_game": hurt_last_game,
         "hurt_last_game_date": hurt_last_game_date,
+        "last_game": av.get("last_game"),
+        "inj_updated": text(av.get("injury_data_updated")),
+        "inj_checked": text(av.get("injury_data_checked")),
     }
 
 
@@ -181,7 +193,7 @@ def log_payload(df: pd.DataFrame) -> list:
 def weather_payload(w: dict) -> dict:
     return {"roof": w["roof"], "temp": num(w["temp"]), "wind": num(w["wind"]),
             "gust": num(w["gust"]), "precip": num(w["precip"]), "flag": w["flag"],
-            "src": w["source"], "at": w.get("fetched")}
+            "src": w["source"], "at": w.get("fetched"), "ko": w.get("kickoff_utc")}
 
 
 def luck_payload(l: pd.DataFrame, team: str):
@@ -343,6 +355,8 @@ def main() -> None:
         "pace_defs": [[k, label] for k, label, _f, _hb in queries.PACE],
         "backtest": backtest,
         "weather_flags": {"wind": WIND_FLAG_MPH, "rain": RAIN_FLAG_PCT},
+        "odds_url": ODDS_RELAY_URL or None,
+        "odds_book": ODDS_BOOK,
     }
 
     # NaN is not valid JSON and would stop the web page from loading, so clean

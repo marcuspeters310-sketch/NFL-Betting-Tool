@@ -40,6 +40,14 @@ SNAP_COUNTS_URL = NFLVERSE_RELEASE + "/snap_counts/snap_counts_{season}.csv.gz"
 
 # Weather: Open-Meteo forecast API (free, no key). Forecasts reach 16 days out.
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+
+# The Cloudflare Worker in worker/ that relays The Odds API to the board's
+# refresh button (it holds the API key; this page never sees it). Empty =
+# no refresh button.
+ODDS_RELAY_URL = os.environ.get("ODDS_RELAY_URL", "https://nfl-board-odds.marcuspeters310.workers.dev")
+# Whose line the refresh shows (the Odds API book title). A game that book
+# hasn't posted falls back to the line most books are dealing.
+ODDS_BOOK = "DraftKings"
 WEATHER_DAYS_AHEAD = 10          # only fetch games kicking off within this many days
 WIND_FLAG_MPH = 15               # flag a game at or above this sustained wind
 RAIN_FLAG_PCT = 50               # ... or at or above this chance of precipitation

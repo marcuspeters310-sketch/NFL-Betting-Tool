@@ -26,6 +26,8 @@ transaction, so a failed download never leaves a table half-written.
 from __future__ import annotations
 
 import io
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Optional
 
 import pandas as pd
@@ -36,12 +38,31 @@ from config import (CURRENT_SEASON, DEPTH_CHARTS_URL, INJURIES_URL,
 from db import start_run, finish_run
 
 
-def _csv(url: str, **kw) -> pd.DataFrame:
+def _get(url: str) -> requests.Response:
     resp = requests.get(url, timeout=300)
     if resp.status_code == 404:
         raise FileNotFoundError(url)
     resp.raise_for_status()
-    return pd.read_csv(io.BytesIO(resp.content), compression="gzip", low_memory=False, **kw)
+    return resp
+
+
+def _csv(url: str, **kw) -> pd.DataFrame:
+    return pd.read_csv(io.BytesIO(_get(url).content), compression="gzip", low_memory=False, **kw)
+
+
+def _last_modified(resp: requests.Response) -> Optional[str]:
+    """The download's Last-Modified header as a UTC ISO timestamp, or None."""
+    raw = resp.headers.get("Last-Modified")
+    if not raw:
+        return None
+    try:
+        return parsedate_to_datetime(raw).astimezone(timezone.utc).isoformat(timespec="seconds")
+    except (TypeError, ValueError):
+        return None
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _clean(df: pd.DataFrame) -> list[tuple]:
@@ -120,7 +141,13 @@ def load_depth_charts(conn, season: int = CURRENT_SEASON) -> int:
 
 
 def load_injuries(conn, season: int = CURRENT_SEASON) -> int:
-    df = _csv(INJURIES_URL.format(season=season))
+    resp = _get(INJURIES_URL.format(season=season))
+    df = pd.read_csv(io.BytesIO(resp.content), compression="gzip", low_memory=False)
+    # The file has no per-player timestamp, but the download says when
+    # nflverse last rebuilt it -- shown on the board as "injury data updated".
+    with conn:
+        conn.execute("INSERT OR REPLACE INTO source_updates (source, updated_at, checked_at) VALUES (?, ?, ?)",
+                     (f"injuries_{season}", _last_modified(resp), _now()))
     df = df.drop_duplicates(["season", "week", "team", "gsis_id"], keep="last")
     out = pd.DataFrame({
         "season": df["season"], "week": df["week"], "game_type": df["game_type"],
@@ -168,6 +195,72 @@ def load_snap_counts(conn, season: int) -> int:
                     "WHERE season = ?", (season,))
 
 
+def _part(x) -> str:
+    return x if isinstance(x, str) else ""
+
+
+def current_listings(conn, season: int = CURRENT_SEASON) -> dict[tuple[str, str], str]:
+    """
+    {(team, gsis_id): status_key} for every player currently listed: on the
+    team's latest injury report, or on a reserve list (IR, PUP, NFI...) in the
+    team's latest weekly roster. A reserve list wins, the same way the board
+    shows a reserve-list player as OUT whatever the report says.
+    """
+    out: dict[tuple[str, str], str] = {}
+    for r in conn.execute("""
+        SELECT i.team, i.gsis_id, i.week, i.report_status, i.practice_status,
+               i.report_injury, i.report_injury2, i.practice_injury
+        FROM injury_reports i
+        JOIN (SELECT team, MAX(week) AS w FROM injury_reports WHERE season = ? GROUP BY team) m
+          ON m.team = i.team AND m.w = i.week
+        WHERE i.season = ?
+    """, (season, season)):
+        out[(r["team"], r["gsis_id"])] = "|".join([
+            f"W{r['week']}", _part(r["report_status"]), _part(r["practice_status"]),
+            _part(r["report_injury"]), _part(r["report_injury2"]), _part(r["practice_injury"])])
+    for r in conn.execute("""
+        SELECT s.team, s.gsis_id, s.status_code
+        FROM roster_status s
+        JOIN (SELECT team, MAX(week) AS w FROM roster_status WHERE season = ? GROUP BY team) m
+          ON m.team = s.team AND m.w = s.week
+        WHERE s.season = ? AND s.status = 'RES'
+    """, (season, season)):
+        out[(r["team"], r["gsis_id"])] = f"RES|{_part(r['status_code'])}"
+    return out
+
+
+def merge_status_log(existing: dict, current: dict, now: str, first_run: bool) -> dict:
+    """
+    Pure merge step of the status tracker (see db.py, injury_status_log).
+    existing: {(team, gsis_id): {"status_key", "first_seen_at", "last_seen_at", "tracking_start"}}
+    current:  {(team, gsis_id): status_key}
+    Returns the new log: unchanged keys keep first_seen_at, changed or new
+    keys start at `now`, players no longer listed drop out.
+    """
+    out = {}
+    for k, key in current.items():
+        old = existing.get(k)
+        if old is not None and old["status_key"] == key:
+            out[k] = {**old, "last_seen_at": now}
+        else:
+            out[k] = {"status_key": key, "first_seen_at": now, "last_seen_at": now,
+                      "tracking_start": 1 if first_run else 0}
+    return out
+
+
+def track_injury_status(conn, season: int = CURRENT_SEASON, now: Optional[str] = None) -> int:
+    now = now or _now()
+    existing = {(r["team"], r["gsis_id"]): dict(r) for r in conn.execute(
+        "SELECT team, gsis_id, status_key, first_seen_at, last_seen_at, tracking_start "
+        "FROM injury_status_log WHERE season = ?", (season,))}
+    new = merge_status_log(existing, current_listings(conn, season), now, first_run=not existing)
+    rows = [(season, t, g, v["status_key"], v["first_seen_at"], v["last_seen_at"], v["tracking_start"])
+            for (t, g), v in new.items()]
+    return _replace(conn, "injury_status_log",
+                    ["season", "team", "gsis_id", "status_key", "first_seen_at", "last_seen_at", "tracking_start"],
+                    rows, "WHERE season = ?", (season,))
+
+
 def load_availability(conn) -> dict[str, str]:
     """Run every loader. A missing file (early season) is a warning, not a crash."""
     jobs = [
@@ -177,9 +270,18 @@ def load_availability(conn) -> dict[str, str]:
         (f"roster_status_{CURRENT_SEASON - 1}", lambda: load_roster_status(conn, CURRENT_SEASON - 1)),
         (f"snap_counts_{CURRENT_SEASON}", lambda: load_snap_counts(conn, CURRENT_SEASON)),
         (f"snap_counts_{CURRENT_SEASON - 1}", lambda: load_snap_counts(conn, CURRENT_SEASON - 1)),
+        # Last: compares the freshly loaded injury report and reserve lists
+        # with the previous refresh's to timestamp each player's status.
+        ("injury_status_log", lambda: track_injury_status(conn)),
     ]
     out = {}
     for name, fn in jobs:
+        # Comparing against a stale download would restart (or drop) players'
+        # "first seen" times, so only track when both inputs loaded fresh.
+        if name == "injury_status_log" and any(
+                out[k].startswith("FAILED") for k in ("injuries", f"roster_status_{CURRENT_SEASON}")):
+            out[name] = "skipped (an input download failed)"
+            continue
         run_id = start_run(conn, f"nflverse_{name}")
         try:
             n = fn()

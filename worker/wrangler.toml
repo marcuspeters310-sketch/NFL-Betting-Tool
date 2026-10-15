@@ -1,0 +1,10 @@
+# Cloudflare Worker that relays The Odds API to the board's refresh button.
+# Deploy:  npx wrangler deploy        (from this folder)
+# Key:     npx wrangler secret put ODDS_API_KEY   (type it at the prompt; never commit it)
+name = "nfl-board-odds"
+main = "odds.js"
+compatibility_date = "2026-09-01"
+
+[[kv_namespaces]]
+binding = "ODDS"
+id = "d94ea5ba97944ccbaf58544ea8018720"   # created with `npx wrangler kv namespace create ODDS`

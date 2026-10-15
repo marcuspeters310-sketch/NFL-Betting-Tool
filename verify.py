@@ -562,6 +562,99 @@ rc_chi = queries.roster_changes("CHI", conn=conn)
 check("roster_changes() (year-over-year turnover) still reads the LIVE depth chart, unaffected by this feature",
       isinstance(rc_chi.get("starters"), int), str(rc_chi.get("starters")))
 
+# ---------------------------------------------------------------------------
+# Injury timing: per-player "status last changed", where the injury came from,
+# and the injury file's own update time.
+# ---------------------------------------------------------------------------
+from sources.rosters import merge_status_log, current_listings
+
+T0, T1 = "2026-10-13T20:30:00+00:00", "2026-10-14T20:30:00+00:00"
+log0 = merge_status_log({}, {("SEA", "a"): "W6|Out", ("SEA", "b"): "RES|R01"}, T0, first_run=True)
+log1 = merge_status_log(log0, {("SEA", "a"): "W6|Questionable", ("SEA", "b"): "RES|R01", ("SEA", "c"): "W6||"}, T1, first_run=False)
+check("status log: an unchanged status keeps its first-seen time, a changed or new one starts now",
+      log1[("SEA", "b")]["first_seen_at"] == T0 and log1[("SEA", "b")]["last_seen_at"] == T1
+      and log1[("SEA", "a")]["first_seen_at"] == T1 and log1[("SEA", "c")]["first_seen_at"] == T1, str(log1))
+check("status log: only the first tracked refresh is marked 'since at least', and dropped players leave the log",
+      log0[("SEA", "a")]["tracking_start"] == 1 and log1[("SEA", "a")]["tracking_start"] == 0
+      and log1[("SEA", "b")]["tracking_start"] == 1
+      and set(merge_status_log(log1, {("SEA", "b"): "RES|R01"}, T1, False)) == {("SEA", "b")})
+
+r = conn.execute("SELECT COUNT(*) AS n, SUM(first_seen_at > last_seen_at) AS bad FROM injury_status_log WHERE season = ?",
+                 (CURRENT_SEASON,)).fetchone()
+n_listed = len(current_listings(conn, CURRENT_SEASON))
+check("status log holds exactly the currently listed players, none first-seen after last-seen",
+      r["n"] == n_listed and not r["bad"], f"{r['n']} logged vs {n_listed} listed, {r['bad']} bad")
+src = conn.execute("SELECT updated_at, checked_at FROM source_updates WHERE source = ?",
+                   (f"injuries_{CURRENT_SEASON}",)).fetchone()
+check("injury file update time is known and not after we downloaded it",
+      src is not None and src["updated_at"] is not None and src["updated_at"] <= src["checked_at"],
+      str(dict(src)) if src else "no row")
+
+check("listing runs: a bye week doesn't break a run, a missed week does",
+      queries._run_start({3, 4, 6}, [1, 2, 3, 4, 6], 6) == 3 and queries._run_start({2, 4}, [1, 2, 3, 4], 4) == 4
+      and queries._run_start({2, 3}, [1, 2, 3, 4], 4) is None)
+check("charted names match roster names by surname (incl. 'St. Brown', hyphens, Jr.)",
+      queries._surname_matches("A.St. Brown", "Amon-Ra St. Brown") and queries._surname_matches("J.Smith-Njigba", "Jaxon Smith-Njigba")
+      and queries._surname_matches("M.Harrison", "Marvin Harrison Jr.") and not queries._surname_matches("C.Simon", "Cody Barton"))
+dup = queries._match_jerseys(
+    _pd.DataFrame({"jersey": [0, 7], "short_name": ["C.Simon", "Q.Nobody"]}),
+    _pd.DataFrame({"jersey": [0, 0], "full_name": ["Cody Barton", "Cody Simon"], "gsis_id": ["x", "y"]}), ["jersey"])
+check("a shared jersey number (offense + defense) resolves to the player whose surname matches, one row per event",
+      len(dup) == 2 and dup.loc[0, "gsis_id"] == "y" and _pd.isna(dup.loc[1, "gsis_id"]), dup.to_dict("records"))
+
+ev = _pd.read_sql_query("SELECT week, team, jersey, short_name FROM game_injury_events WHERE season = ?",
+                        conn, params=[CURRENT_SEASON])
+if len(ev):
+    names = _pd.read_sql_query("SELECT week, team, jersey, full_name, gsis_id FROM roster_status WHERE season = ?",
+                               conn, params=[CURRENT_SEASON])
+    mm = queries._match_jerseys(ev, names, ["week", "team", "jersey"])
+    agree = sum(queries._surname_matches(s, f) for s, f in zip(mm["short_name"], mm["full_name"]))
+    check("95%+ of this season's charted in-game injuries tie to a roster player with the same surname",
+          agree >= 0.95 * len(ev), f"{agree}/{len(ev)}")
+
+cur_week = int(queries.week_slate(CURRENT_SEASON, None, conn=conn).iloc[0]["week"])
+slate_teams = sorted({t for _, g in queries.week_slate(CURRENT_SEASON, cur_week, conn=conn).iterrows()
+                      for t in (g["home_team"], g["away_team"])})
+bad_origin, missing, n_og = [], [], 0
+for t in slate_teams:
+    o = queries.injury_origins(t, CURRENT_SEASON, cur_week, conn)
+    lg = o["last_game"]["wk"] if o["last_game"] else None
+    for gid, p in o["players"].items():
+        n_og += 1
+        if (p["k"] == "game") != (p["g"] is not None and p["g"]["wk"] == lg) or not (1 <= p["since"] <= cur_week) \
+                or (p["gb"] is not None and p["gb"]["wk"] >= p["since"]) \
+                or (p["k"] != "game" and p["g"] is not None and (p["gb"] is None or p["g"]["wk"] != p["gb"]["wk"])):
+            bad_origin.append((t, gid, p))
+    dc = queries.availability(t, CURRENT_SEASON, cur_week, conn=conn)["depth"]
+    if len(dc):
+        hurt = dc[~dc["status"].isin(["active", "gone"])]
+        missing += [(t, n) for n, og in zip(hurt["player_name"], hurt["origin"]) if not isinstance(og, dict)]
+check(f"injury origins are consistent: 'game' only for the last game, 'since' within the season, the game checked precedes the listing ({n_og} players)",
+      not bad_origin, str(bad_origin[:3]))
+check("every injured or reserve-list player on a depth chart gets an origin", not missing, str(missing[:5]))
+
+# ---------------------------------------------------------------------------
+# Pass / rush EPA, nested under total EPA on the game page and team page.
+# ---------------------------------------------------------------------------
+def _epa_outside(df, tol):
+    return [(t, side) for t in df.index for side in ("off", "def")
+            if _pd.notna(df.loc[t, f"{side}_epa"])
+            and not (min(df.loc[t, f"{side}_pass_epa"], df.loc[t, f"{side}_rush_epa"]) - tol
+                     <= df.loc[t, f"{side}_epa"]
+                     <= max(df.loc[t, f"{side}_pass_epa"], df.loc[t, f"{side}_rush_epa"]) + tol)]
+
+raw_out = [(s, x) for s in (CURRENT_SEASON - 1, CURRENT_SEASON)
+           for x in _epa_outside(queries._season_rates(conn, s, None), 1e-9)]
+check("within each season, every team's total EPA lies between its pass and rush EPA (their play-weighted mix)",
+      not raw_out, str(raw_out[:5]))
+m_all = queries.team_metrics(CURRENT_SEASON, None, conn=conn)
+outside = _epa_outside(m_all, 0.005)
+check("after blending two seasons, total EPA stays within 0.005 of its pass/rush range (the page says 'a hair outside')",
+      not outside, str(outside[:5]))
+check("pass and rush EPA keep rank 1 = best: highest on offense, lowest allowed on defense",
+      all(m_all.loc[m_all[f"{k}_rank"] == 1, k].iloc[0] == (m_all[k].max() if k.startswith("off") else m_all[k].min())
+          for k in ("off_pass_epa", "off_rush_epa", "def_pass_epa", "def_rush_epa")))
+
 conn.close()
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,82 @@
   Flags: wind 15+ mph or 50%+ chance of rain (`config.py`). A failed fetch
   keeps the last good forecast.
 
+## Oct 15 additions
+
+- **Pick tab (game page):** choose a bet (each team's spread, Over, Under)
+  and get a 5-8 sentence write-up for the group chat, with a Copy button.
+  Built in the page (`pickReasons` / `pickParagraph` in the template) from
+  the same numbers the board shows: it scores every reason that FAVORS the
+  chosen bet (EPA and pass/rush mismatches, scoring, ATS form, opponent's ATS
+  slump, starters out, power-rating gap, luck, rest; for totals: points
+  estimate, both offenses/defenses, pace, explosives, O/U form, weather,
+  model total, injuries), keeps the top 3-5, and frames them. When fewer
+  than 3 strong reasons exist it adds smaller edges and says the matchup
+  isn't lopsided. It argues a side on purpose; it isn't a prediction.
+- **L3 colors on tiles:** blue = covers / overs, orange = misses / unders
+  (the colorblind-safe chart pair). Solid when one side leads by 2+ (3-0,
+  2-0-1), tinted for 2-1, plain when even.
+- **Live lines (refresh icon, top right):** `worker/odds.js` is a Cloudflare
+  Worker that holds The Odds API key as a secret, pulls NFL spreads and
+  totals for US books (2 credits a pull), and returns them trimmed. It
+  reuses a pull for 10 minutes, makes at most 12 pulls a day, and stops
+  pulling below 40 credits left in the month, serving the last pull with a
+  note instead. The page shows DraftKings' line (`config.ODDS_BOOK`), falling back to the line most books are dealing (ties go to
+  the one nearest the median), converts the API's home-team number to the
+  board's convention (`spread = -home point`, + = home favored), and
+  recomputes each model gap (`model - market`). Stats, trends and injuries
+  still update on the scheduled refresh. A viewer's last pull is reused for
+  up to 12 hours if it's newer than the build. The icon only appears when
+  `ODDS_RELAY_URL` is set in `config.py` (or the environment).
+  Offline Worker test (no key, no credits): `node worker/test_odds.mjs`.
+  - Deploy (from `worker/`): `npx wrangler login`, then
+    `npx wrangler kv namespace create ODDS` (paste the id into
+    `wrangler.toml`), `npx wrangler secret put ODDS_API_KEY` (type the key at
+    the prompt), `npx wrangler deploy`. Put the printed workers.dev URL in
+    `ODDS_RELAY_URL`.
+- **Fix:** a game link (`#game=...`) now opens the game page even when the
+  last week you viewed was a results week.
+
+## Oct 14 additions
+
+- **EPA split (game page "Matchup" tab, Teams page):** total EPA/play with
+  pass and rush EPA nested under it, offense vs defense in both directions.
+  Pass = every dropback, including sacks and scrambles; rush = designed runs
+  (`sources/pbp.py`). Within a season the total is the play-weighted mix of
+  the two; after the two-season blend it can sit a hair outside (verify.py
+  allows 0.005). Homepage tiles still show total EPA only.
+- **Injury origin** (`queries.injury_origins`), on every injured player's card
+  and Roster-tab detail, plus a short "When" column in the reserve and
+  other-injury tables:
+  - *Hurt in the Week N game vs X (Q3 4:12), returned / did not return* --
+    charted in the team's last game (`game_injury_events`).
+  - *First listed on the Week N report* -- with "not charted as hurt in the
+    Week N-1 game, so likely a practice injury (or illness, or a hit the
+    charting missed)" when the play-by-play shows nothing.
+  - *On the injury report / a reserve list since Week N* -- the unbroken run of
+    listings (bye weeks don't break it), plus the charted game injury that
+    started it, if any.
+  Play-by-play injuries are tied to players by team + week + jersey, and a
+  shared jersey (offense and defense can both wear #0-99) is resolved by
+  matching the charted surname (`queries._match_jerseys`; this also fixed
+  `hurt_last_game`).
+- **Injury timestamps:** nflverse's injury file has no per-player time, so:
+  - `source_updates` stores the file's Last-Modified time each refresh, shown
+    as "nflverse injury data updated ..." per team.
+  - `injury_status_log` stores, per listed player, when a refresh first saw
+    their current listing (report week + game status + practice status +
+    injury, or reserve code). Shown as "Status last changed ...". Precision
+    is the refresh schedule. Rows created on the first tracked refresh say
+    "Listed this way since at least ..." because the status may be older.
+    The log lives in the database, so it persists through the Actions cache;
+    if the cache is ever lost, tracking restarts with "since at least".
+- **Weather timestamp:** "updated <fetch time>, N h before kickoff" in the
+  weather strip (fetch time from `weather_forecasts.fetched_at`).
+- **Team logos** on homepage tiles, results tiles and the game page header:
+  ESPN images (the links nflverse publishes in teams_colors_logos.csv) via
+  ESPN's resizer at 80 px (~4 KB each). A logo that fails to load removes
+  itself and the team abbreviation still shows.
+
 ## The website (Sept 16 redesign; week visibility + results Sept 23; opening-day depth chart Sept 23)
 
 - **Which weeks show up:** the current week (the earliest one with an
@@ -315,7 +391,7 @@ into it, so `web\NFL Board.html` also opens fine straight from your folder.
 ## Command line
 
 ```
-python verify.py              # 78 checks — run this first
+python verify.py              # 91 checks — run this first
 python show.py slate          # this week's games in kickoff order
 python show.py slate 2025 12  # any past week, with results and ATS outcomes
 python show.py team CHI       # Bears ATS splits, last 3 seasons
@@ -358,7 +434,7 @@ returns `n` alongside the percentage.
 | `sources/rosters.py` | Depth charts -- both the latest daily snapshot (`depth_chart`) and the frozen Week 1 one (`depth_chart_opening`, anchored to that season's roster cutdown via `_opening_day_anchor`, both from the same download) -- injury reports, weekly roster status (IR, PUP, NFI), snap counts. |
 | `backfill.py` | Builds the database. Run again after any Sunday to pull in results. Run with `--full` once after upgrading to this feature, so `game_injury_events` backfills for already-cached seasons. |
 | `queries.py` | Every number the screens display comes from here: `team_metrics()`, `matchup_table()`, `ats_angles()`, `recent_games()` (last-N, or `since_season=` for the full ATS chart), `game_box_score()` (a played game's real stats, for the results view), `availability()` (depth chart frozen to `depth_chart_opening`, current status overlaid, `"gone"` status for anyone who's left the roster) / `hurt_last_game()`, `roster_changes()` (year-over-year turnover, deliberately still against `depth_chart`'s latest snapshot), `model_lines()`, `model_backtest()`, `luck_table()`. |
-| `verify.py` | 78 checks: ATS logic, team metrics, cover margins, injury overlay, in-game injury parsing, week-visibility rules, results-view stats, model (out-of-sample, sane constants), luck, pace. Re-run after any change. |
+| `verify.py` | 91 checks: ATS logic, team metrics, cover margins, injury overlay, in-game injury parsing, week-visibility rules, results-view stats, model (out-of-sample, sane constants), luck, pace. Re-run after any change. |
 | `app.py` | **Screen 1.** The board itself. `streamlit run app.py` |
 | `Run NFL Board.bat` | Double-click launcher for Windows. |
 | `export_board.py` | Builds the website snapshot: `board_data.json` + `web\NFL Board.html`. `determine_weeks()` / `show_next_week()` decide which weeks are upcoming vs. results. |

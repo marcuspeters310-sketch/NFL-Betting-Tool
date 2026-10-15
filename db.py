@@ -325,6 +325,40 @@ CREATE TABLE IF NOT EXISTS weather_forecasts (
     precip_pct    REAL,               -- chance of precipitation, 0-100
     source        TEXT
 );
+
+-- ---------------------------------------------------------------------------
+-- source_updates: when a publisher last changed a file we download, read off
+-- the download's HTTP Last-Modified header (nflverse release assets carry the
+-- time the file was last rebuilt). One row per source, replaced each run.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS source_updates (
+    source        TEXT PRIMARY KEY,   -- e.g. 'injuries_2026'
+    updated_at    TEXT,               -- UTC ISO: publisher's last update, NULL if unknown
+    checked_at    TEXT NOT NULL       -- UTC ISO: when we downloaded it
+);
+
+-- ---------------------------------------------------------------------------
+-- injury_status_log: when this board first saw each player's CURRENT listing.
+-- nflverse's injury file has no per-player timestamp -- it only says what the
+-- status is, not when it changed -- so every refresh compares each listed
+-- player's status_key (report week + game status + practice status + injury,
+-- or the reserve-list code) with the last one stored. Same key: last_seen_at
+-- moves forward. New key: first_seen_at resets to this refresh. Players no
+-- longer listed are deleted, so a return to the list starts fresh.
+-- Precision is the refresh schedule: "first seen" means "appeared between the
+-- previous refresh and this one". tracking_start = 1 marks rows created on the
+-- first tracked refresh of a season, whose status may be older than that.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS injury_status_log (
+    season          INTEGER NOT NULL,
+    team            TEXT NOT NULL,
+    gsis_id         TEXT NOT NULL,
+    status_key      TEXT NOT NULL,
+    first_seen_at   TEXT NOT NULL,
+    last_seen_at    TEXT NOT NULL,
+    tracking_start  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (season, team, gsis_id)
+);
 """
 
 # ---------------------------------------------------------------------------
