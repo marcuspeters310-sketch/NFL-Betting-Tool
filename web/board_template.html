@@ -47,7 +47,24 @@ button{font:inherit;color:inherit}
 .brand h1{white-space:nowrap}
 .brand h1{font:700 26px/1 var(--display);letter-spacing:.01em;margin:0;text-transform:uppercase}
 .brand h1 span{background:var(--chalk);color:var(--chalk-ink);padding:0 6px;margin-left:2px}
-.stamp{font-size:12px;color:var(--muted)}
+/* Refresh status strip (renderStatus): one row per data source on phones, three columns from 760px. */
+.rstrip{display:grid;gap:4px;margin-top:10px;padding:6px 10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:12.5px}
+.rs-row{display:grid;grid-template-columns:96px minmax(0,1fr) auto;align-items:center;column-gap:8px;min-height:36px}
+.rs-row + .rs-row{border-top:1px solid var(--line);padding-top:4px}
+.rs-k{font:600 11px/1.2 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.rs-v{line-height:1.3;min-width:0}
+.rs-v b{font-weight:600}
+.rs-v small{display:block;color:var(--muted);font-size:11.5px}
+.rs-v small.warn{color:var(--bad)}
+.rs-dot{width:8px;height:8px;border-radius:50%;background:var(--line);flex:none}
+.rs-row.fresh .rs-dot{background:var(--good)} .rs-row.stale .rs-dot{background:var(--chalk)} .rs-row.err .rs-dot{background:var(--bad)}
+.rstrip .refresh{width:32px;height:32px}
+@media (min-width:760px){
+  .rstrip{grid-template-columns:repeat(4,minmax(0,1fr));gap:0 14px}
+  .rs-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"k b" "v b";align-content:start}
+  .rs-row + .rs-row{border-top:0;padding-top:0;border-left:1px solid var(--line);padding-left:14px}
+  .rs-k{grid-area:k} .rs-v{grid-area:v} .rs-b{grid-area:b}
+}
 .refresh{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
 .refresh svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .refresh.busy svg{animation:spin .8s linear infinite}
@@ -62,6 +79,9 @@ button{font:inherit;color:inherit}
 .weekbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:18px 0 6px}
 .weekbar h2{font:700 34px/1 var(--display);text-transform:uppercase;margin:0}
 .weekbar .sub{color:var(--muted);font-size:13px}
+/* The week picker grows a button per completed week: swipe it rather than widen the page. */
+.weekbar .seg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+.weekbar .seg button{white-space:nowrap;flex:none}
 .guide{margin:10px 0 18px;background:var(--surface);border:1px solid var(--line);border-radius:8px;font-size:14px}
 .guide summary{padding:10px 14px;cursor:pointer;font-weight:500}
 .guide div{padding:0 14px 12px;color:var(--muted);max-width:70ch}
@@ -174,6 +194,13 @@ details.more[open] summary{margin-bottom:10px}
 .hcard .who{font-weight:600}
 .hcard .role{font-size:12px;color:var(--muted)}
 .hcard .det{font-size:13px;color:var(--muted)}
+.espn{font-size:12.5px;line-height:1.4;border-top:1px dashed var(--line);padding-top:6px;display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}
+.espn-src{font:700 10px/1 var(--body);letter-spacing:.06em;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:2px 4px;margin-right:6px;vertical-align:1px}
+.espn-sc{margin:0}
+.espn-more summary{cursor:pointer;color:var(--muted);font-size:12px;width:max-content}
+.espn-more p{margin:4px 0 0;color:var(--muted)}
+.st.esp{background:transparent;border:1px dashed currentColor;padding:2px 4px;color:var(--ink)}
+tr.espn-row td{border-top:0;padding-top:0;white-space:normal}
 .origin{font-size:12.5px;line-height:1.35}
 .origin.game{font-weight:600}
 .share{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
@@ -221,6 +248,39 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 @media (prefers-reduced-motion:no-preference){ details.game .body{animation:fade .18s ease-out} @keyframes fade{from{opacity:.4}to{opacity:1}} }
 /* ---- game tiles (This week) ---- */
 .tiles-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+/* Player props (This week toggle, prop tiles, game-page Props tab). Over = blue, under = orange. */
+.boardsw{margin:0 0 12px}
+.ptile .prow-s{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:baseline;font-size:13px;padding:5px 0;border-top:1px solid var(--line)}
+.ptile .prow-s:first-of-type{border-top:0}
+.ptile .pteam{font:600 11px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px}
+.prow-s .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pnote{font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.45}
+.pfilter{margin:0 0 12px}
+.pteam-h{display:flex;align-items:center;gap:6px;font:700 20px/1 var(--display);text-transform:uppercase;margin:18px 0 8px}
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media (min-width:820px){.pgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.pcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.pc-h{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px}
+.pc-h b{font-weight:600}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:7px 0;color:inherit;font:inherit;cursor:pointer}
+.prow .pl{font-size:13px;font-weight:500}
+.prow .pline{font-size:13px;text-align:right;white-space:nowrap}
+.prow .pline small{color:var(--muted);font-size:11px;margin-left:4px}
+.pchips{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.hchip{font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:1px 5px;white-space:nowrap}
+.hchip small{color:var(--muted);font-size:10px;margin-right:3px;text-transform:uppercase;letter-spacing:.04em}
+.hchip.ov{background:color-mix(in srgb,var(--cover) 18%,transparent)}
+.hchip.un{background:color-mix(in srgb,var(--miss) 20%,transparent)}
+.hchip.sig{border-color:currentColor;font-weight:600}
+.pdetail{grid-column:1 / -1;margin:2px 0 6px}
+.pbars{display:flex;align-items:flex-end;gap:3px;height:54px;position:relative;margin:6px 0 2px;border-bottom:1px solid var(--line)}
+.pbars i{flex:1;min-width:6px;border-radius:2px 2px 0 0}
+.pbars i.ov{background:var(--cover)} .pbars i.un{background:var(--miss)} .pbars i.pu{background:var(--muted)}
+.pbars .pline-mark{position:absolute;left:0;right:0;border-top:1px dashed var(--ink);height:0}
+.plog{font-size:12px;width:100%}
+.plog td,.plog th{padding:3px 4px}
+.res-o{color:var(--cover);font-weight:600} .res-u{color:var(--miss);font-weight:600}
+
 @media (min-width:820px){.tiles-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (min-width:1180px){.wrap{max-width:1180px}.tiles-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .gtile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0;scroll-margin-top:70px}
@@ -261,7 +321,7 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 .wx.compact .wx-i.warn{color:#E6BC17}
 .final{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;padding:6px 10px;border-radius:8px;background:var(--ink);color:var(--bg);font-size:12.5px}
 .mt{display:flex;flex-direction:column}
-.mt h5,.changes h5{font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
+.mt h5,.kir-h{font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
 .mhead{display:grid;grid-template-columns:minmax(0,1fr) 116px minmax(0,1fr);font-size:11px;color:var(--muted);padding-top:2px}
 .mhead b{font:700 16px/1 var(--display);color:var(--ink)}
 .mhead span:last-child{text-align:right}
@@ -311,12 +371,24 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 .ghero .final{background:#1C2621;color:#F2F5F3}
 .gtabs{position:sticky;top:0;z-index:4;display:flex;background:var(--surface);border-bottom:1px solid var(--line);padding:0 8px}
 .gtabs a{flex:1 1 0;text-align:center;padding:11px 0 9px;font-weight:600;font-size:14px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent}
+.gtabs a{display:flex;align-items:center;justify-content:center;line-height:1.15}
+@media (max-width:520px){.gtabs{padding:0 2px}.gtabs a{font-size:12.5px;padding:9px 2px 7px}}
 .gtabs a[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--chalk)}
 .gbody{padding:12px 16px 8px;display:flex;flex-direction:column;gap:10px;max-width:760px;margin:0 auto}
 .gbody .sw button .soft{font-weight:400}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .card.flush{padding:0;overflow:hidden}
 .card h4{font:700 17px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;margin:4px 0 6px}
+.kir-card .pair{gap:10px 16px}
+.kir-h{display:flex;align-items:center;gap:5px}
+.kir-h .soft{font-weight:500;letter-spacing:.04em}
+.kir{border-left:3px solid var(--line);padding:4px 0 4px 8px;margin:6px 0;display:grid;gap:2px;font-size:13px;min-width:0}
+.kir.out{border-left-color:var(--bad-strong)} .kir.doubtful{border-left-color:var(--bad)} .kir.questionable{border-left-color:var(--chalk)}
+.kir-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.kir-det{font-size:12.5px;line-height:1.35}
+.team-roster{margin-top:22px;display:grid;gap:10px}
+.team-h{display:flex;align-items:center;gap:6px;font:700 22px/1 var(--display);text-transform:uppercase;margin:0;padding-top:12px;border-top:2px solid var(--ink)}
+.team-h .soft{font:500 13px var(--body);text-transform:none}
 .card-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .pad{padding-left:12px;padding-right:12px}
 .card-h.pad{padding-top:8px}
@@ -333,15 +405,6 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 .res.miss{background:color-mix(in srgb,var(--miss) 20%,var(--surface));color:var(--miss)}
 .res.over{background:var(--ink);color:var(--bg)}
 .res.under{background:var(--sunk);color:var(--ink)}
-.changes{background:color-mix(in srgb,var(--chalk) 9%,var(--surface));border-color:color-mix(in srgb,var(--chalk) 45%,var(--line))}
-.changes p{margin:0 0 6px;font-size:13px}
-.kv{display:grid;grid-template-columns:58px minmax(0,1fr);row-gap:3px;font-size:13px}
-.chg{color:var(--bad)}
-.chrow{display:grid;grid-template-columns:42px minmax(0,1fr) auto;column-gap:6px;align-items:baseline;font-size:12.5px;padding:2px 0}
-.chrow .num{font-size:11px}
-.chrow .nm{font-weight:500}
-.chrow .r{text-align:right;font-size:11.5px}
-.chrow .gone{color:var(--bad)}
 .dwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-top:1px solid var(--line)}
 .dtable{display:flex;flex-direction:column;width:max-content;min-width:100%}
 .dr{display:flex;align-items:center;border-bottom:1px solid var(--sunk);background:var(--surface)}
@@ -354,6 +417,7 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 .dbtn{border:0;padding:0;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .dbtn.on{text-decoration:underline;text-underline-offset:3px}
 .tag{font-size:11px;font-weight:700;margin-left:2px}
+.tag.esp{border-bottom:1px dashed currentColor}
 .tag.out{color:var(--bad)} .tag.doubtful,.tag.questionable,.tag.limited{color:#B07A00} .tag.gone{color:var(--muted)}
 :root[data-theme="dark"] .tag.doubtful,:root[data-theme="dark"] .tag.questionable,:root[data-theme="dark"] .tag.limited{color:var(--chalk)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tag.doubtful,:root:not([data-theme="light"]) .tag.questionable,:root:not([data-theme="light"]) .tag.limited{color:var(--chalk)}}
@@ -381,13 +445,19 @@ tr.here td{background:color-mix(in srgb,var(--chalk) 14%,transparent)}
 </style>
 
 <header class="top"><div class="wrap">
-  <div class="brand"><h1>NFL <span>Board</span></h1><span class="stamp" id="stamp"></span><span class="stamp" id="lines-stamp" aria-live="polite"></span></div>
-  <button type="button" class="refresh" id="refresh" hidden aria-label="Refresh game lines" title="Refresh game lines"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 3.5v3.2h-3.2"/></svg></button>
+  <div class="brand"><h1>NFL <span>Board</span></h1></div>
   <div class="seg" role="group" aria-label="View">
     <button id="tab-week" type="button" data-view="week">This week</button>
     <button id="tab-teams" type="button" data-view="teams">Teams</button>
   </div>
 </div></header>
+
+<section class="wrap rstrip" aria-label="When each part of the board was last refreshed">
+  <div class="rs-row" id="rs-app"><span class="rs-k"><i class="rs-dot"></i>Full app</span><span class="rs-v"></span><span class="rs-b"></span></div>
+  <div class="rs-row" id="rs-lines"><span class="rs-k"><i class="rs-dot"></i>Game lines</span><span class="rs-v"></span><span class="rs-b"><button type="button" class="refresh" id="refresh" hidden aria-label="Refresh game lines" title="Refresh game lines"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 3.5v3.2h-3.2"/></svg></button></span></div>
+  <div class="rs-row" id="rs-props"><span class="rs-k"><i class="rs-dot"></i>Player props</span><span class="rs-v"></span><span class="rs-b"><button type="button" class="refresh" id="props-refresh" hidden aria-label="Refresh player props" title="Refresh player props (PropLine)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 3.5v3.2h-3.2"/><circle cx="10" cy="10" r="1.6"/></svg></button></span></div>
+  <div class="rs-row" id="rs-inj"><span class="rs-k"><i class="rs-dot"></i>Injuries</span><span class="rs-v"></span><span class="rs-b"><button type="button" class="refresh" id="inj-refresh" aria-label="Refresh injury news from ESPN" title="Refresh injury news (ESPN, free)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3.5h4v4.5h4.5v4H12v4.5H8V12H3.5V8H8z"/></svg></button></span></div>
+</section>
 
 <main class="wrap" id="app"></main>
 
@@ -423,6 +493,9 @@ const state = {
   gameTeam: null,
   depthSel: null,
   pick: {},          // game id -> chosen bet on the Pick tab
+  board: store.get("board", "lines"),   // This week: "lines" (game lines) or "props" (player props)
+  propFilter: "all",
+  propOpen: new Set(),  // "gameId|player|market" rows showing the game log
 };
 const isResultsWeek = w => (D.results_weeks || []).some(x => x.week === w);
 const allWeekNums = () => [...D.weeks.map(w => w.week), ...(D.results_weeks || []).map(w => w.week)];
@@ -484,7 +557,7 @@ function depthBoard(av, side){
     rows.get(p.p).push(p);
   }
   return `<div class="depth">${[...rows].map(([pos, ps]) => `<div class="row"><span class="pos">${pos}</span><span class="names">${
-    ps.map(p => `<span class="${p.st ? "p1" : "dim"} ${(p.x === "out" || p.x === "gone") ? "hurt-out" : ""}">${esc(p.n)}</span>${pill(p.x, p.rs)}`).join("")
+    ps.map(p => `<span class="${p.st ? "p1" : "dim"} ${(p.x === "out" || p.x === "gone") ? "hurt-out" : ""}">${esc(p.n)}</span>${pillFor(p)}`).join("")
   }</span></div>`).join("")}</div>`;
 }
 function shareBar(v, label){
@@ -492,10 +565,10 @@ function shareBar(v, label){
   return `<div class="share"><span>${label}</span><span class="track"><b style="width:${Math.round(v*100)}%"></b></span><span class="num">${Math.round(v*100)}%</span></div>`;
 }
 function hurtCards(av, onlyStarters){
-  let list = av.depth.filter(p => p.x !== "active");
+  let list = av.depth.filter(p => p.x !== "active" || espnListed(p));
   if (onlyStarters) list = list.filter(p => p.st);
   list = list.slice().sort((a, b) => (b.st - a.st) || ((b.sh ?? 0) - (a.sh ?? 0)));
-  if (!list.length) return `<p class="meta">Nobody on this depth chart is on the injury report or a reserve list.</p>`;
+  if (!list.length) return `<p class="meta">Nobody on this depth chart is on the injury report, a reserve list, or ESPN's injury list.</p>`;
   // Starters, game-status players and real rotation pieces get a card; deep
   // backups on long-term lists go in a collapsed line so they don't bury them.
   const main = list.filter(p => p.st || p.x !== "out" || (p.sh ?? 0) >= 0.25);
@@ -504,9 +577,12 @@ function hurtCards(av, onlyStarters){
     <p class="meta">${deep.map(p => `${esc(p.n)} (${p.p}${p.sh != null ? ", " + Math.round(p.sh*100) + "% snaps" : ""})${pill(p.x, p.rs)}`).join(" · ")}</p></details>` : ""}`;
 }
 function card(p){
-  return `<div class="hcard ${p.x}">
-    <div class="htop"><span><span class="who">${esc(p.n)}</span>${pill(p.x, p.rs)}</span><span class="role">${p.p} · ${p.st ? "starter" : "backup #" + p.r}</span></div>
-    <div class="det">${esc([p.rs, p.inj].filter(Boolean).join(" · ") || "Limited in practice")}${p.pr ? ` · ${esc(p.pr.replace(" in Practice","").replace("Participation","practice"))}` : ""}</div>
+  const official = p.x === "active" ? (p.pr ? "No game status on the official report" : "Not on the official injury report")
+    : [p.rs, p.inj].filter(Boolean).join(" · ") || "Limited in practice";
+  return `<div class="hcard ${p.x === "active" ? espnBucket(espnOf(p)?.s) : p.x}">
+    <div class="htop"><span><span class="who">${esc(p.n)}</span>${pillFor(p)}</span><span class="role">${p.p} · ${p.st ? "starter" : "backup #" + p.r}</span></div>
+    <div class="det">${esc(official)}${p.pr ? ` · ${esc(p.pr.replace(" in Practice","").replace("Participation","practice"))}` : ""}</div>
+    ${espnBlock(p)}
     ${p.og ? `<div class="origin ${p.og.k}">${esc(originText(p.og))}</div>` : ""}
     ${p.fs ? `<div class="role">${esc(seenText(p))}</div>` : ""}
     ${shareBar(p.sh, "Snaps")}${p.sb ? `<div class="role">snap share from ${esc(p.sb)}</div>` : ""}
@@ -538,7 +614,78 @@ function seenText(p){
   return p.fs0 ? `Listed this way since at least ${fmtStamp(p.fs)}` : `Status last changed ${fmtStamp(p.fs)}`;
 }
 function injSourceText(av){
-  return av?.inj_updated ? `nflverse injury data updated ${fmtStamp(av.inj_updated)}.` : "";
+  const nfl = av?.inj_updated ? `nflverse injury data updated ${fmtStamp(av.inj_updated)}.` : "";
+  const espn = LIVE_INJ.byId ? `ESPN injury news pulled ${fmtStamp(LIVE_INJ.at)}.`
+    : av?.espn_at ? `ESPN status as of ${fmtStamp(av.espn_at)}; tap the + icon for ESPN's latest notes.` : "";
+  return [nfl, espn].filter(Boolean).join(" ");
+}
+
+/* ESPN injury list. `es` on a player is ESPN's listing as of the scheduled
+   refresh (status, injury, estimated return, ESPN's last update). The +
+   icon pulls ESPN live (refreshInjuries below), which replaces `es` and adds
+   ESPN's notes. The notes are only ever shown from that live pull. */
+const LIVE_INJ = {at: null, byId: null};
+const ESPN_TEAM = {LAR: "LA", WSH: "WAS"};           // must match sources/espn_injuries.TEAM_FIX
+function espnOf(r){
+  if (!r) return null;
+  if (LIVE_INJ.byId && r.e) return LIVE_INJ.byId.get(r.e) || null;   // live pull: not listed = not listed
+  return r.es || null;
+}
+const espnListed = r => { const x = espnOf(r); return !!x && x.s !== "Active"; };
+// Card color: anything ESPN doesn't call Active, Questionable or Doubtful (Out, IR, Suspension, PUP...) reads as out.
+const espnBucket = s => !s || s === "Active" ? "active" : s === "Questionable" ? "questionable" : s === "Doubtful" ? "doubtful" : "out";
+const ESPN_SHORT = {"Questionable": "Q", "Doubtful": "D", "Out": "OUT", "Injured Reserve": "IR", "Suspension": "SUSP", "Day-To-Day": "DTD"};
+function espnPill(r){
+  const x = espnOf(r);
+  if (!x || x.s === "Active") return "";
+  return `<span class="st esp" title="${esc("ESPN: " + x.s + " (no game status on the official report)")}">${esc(ESPN_SHORT[x.s] || x.s.split(" ")[0].toUpperCase())}</span>`;
+}
+// Official-report pill when there is one, else ESPN's (dashed outline).
+const pillFor = p => p.x !== "active" ? pill(p.x, p.rs) : espnPill(p);
+function fmtDay(iso){
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {weekday: "short", month: "short", day: "numeric"});
+}
+function espnBlock(r){
+  const x = espnOf(r);
+  if (!x) return "";
+  const facts = [`<b>${esc(x.s)}</b>`];
+  if (x.i && x.i !== x.s) facts.push(esc(x.i));
+  if (x.ret) facts.push(`est. return ${esc(fmtDay(x.ret))}`);
+  if (x.up) facts.push(`updated ${esc(fmtStamp(x.up))}`);
+  return `<div class="espn"><div><span class="espn-src">ESPN</span>${facts.join(" · ")}</div>
+    ${x.sc ? `<p class="espn-sc">${esc(x.sc)}</p>` : ""}
+    ${x.lc && x.lc !== x.sc ? `<details class="espn-more"><summary>More from ESPN</summary><p>${esc(x.lc)}</p></details>` : ""}</div>`;
+}
+// Injury text from ESPN's details, same rules as sources/espn_injuries.injury_text.
+function espnInjury(d){
+  const none = v => !v || /^not specified$/i.test(String(v).trim());
+  if (!d || none(d.type)) return null;
+  const extra = [d.detail, d.side].filter(v => !none(v) && String(v).trim().toLowerCase() !== String(d.type).trim().toLowerCase())
+    .map(v => String(v).trim().toLowerCase());
+  return extra.length ? `${String(d.type).trim()} (${extra.join(", ")})` : String(d.type).trim();
+}
+// Players ESPN lists as hurt who aren't anywhere else on this team's board.
+function espnOnly(av, t){
+  if (!LIVE_INJ.byId) return av.espn_only || [];
+  const rows = [...av.depth, ...av.reserve, ...av.other];
+  const ids = new Set(rows.map(r => r.e).filter(Boolean));
+  const names = new Set(rows.map(r => (r.n || r.player_name || "").toLowerCase()));
+  const baked = new Map((av.espn_only || []).map(r => [r.e, r]));
+  return [...LIVE_INJ.byId.values()]
+    .filter(x => x.team === t && x.s !== "Active" && !ids.has(x.e) && !names.has((x.n || "").toLowerCase()))
+    .map(x => baked.get(x.e) || {player_name: x.n, position: x.p, e: x.e, snap_share: null});
+}
+// The ESPN line under a player's row in the reserve / injury-report tables.
+const espnRow = (r, cols) => espnOf(r) ? `<tr class="espn-row"><td colspan="${cols}">${espnBlock(r)}</td></tr>` : "";
+function espnOnlyBlock(av, t){
+  const list = espnOnly(av, t);
+  if (!list.length) return "";
+  return `<details class="more"><summary>${list.length} more on ESPN's injury list (not on the depth chart or official report)</summary>
+    <div class="injlist" style="margin-top:8px">${list.map(r => `<div class="hcard ${espnBucket(espnOf(r)?.s)}">
+      <div class="htop"><span><span class="who">${esc(r.player_name)}</span>${espnPill(r)}</span><span class="role">${esc(r.position || "")}${r.snap_share != null ? ` · ${Math.round(r.snap_share * 100)}% snaps` : ""}</span></div>
+      ${espnBlock(r)}</div>`).join("")}</div></details>`;
 }
 function hurtLastGameBlock(av){
   if (av.current || !av.hurt_last_game?.length) return "";
@@ -567,14 +714,15 @@ function availabilityPanel(t){
     r.og.k === "game" ? `Hurt Wk ${r.og.g.wk}${r.og.g.ret ? ", returned" : ", didn't return"}` : r.og.g ? `Hurt Wk ${r.og.g.wk}` : r.og.k === "new" ? `New Wk ${r.og.since}` : `Since Wk ${r.og.since}`}</span>`;
   const extra = (av.reserve.length ? `<details class="more"><summary>${av.reserve.length} more on reserve lists (not on the depth chart)</summary>
       <div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Pos</th><th>List</th><th>When</th><th class="r">Snaps</th></tr></thead><tbody>
-      ${av.reserve.map(r => `<tr><td>${esc(r.player_name)}</td><td>${esc(r.position)}</td><td>${esc(r.list)}</td><td>${ogCell(r)}</td><td class="r num">${r.snap_share == null ? "–" : Math.round(r.snap_share*100) + "%"}</td></tr>`).join("")}
+      ${av.reserve.map(r => `<tr><td>${esc(r.player_name)}</td><td>${esc(r.position)}</td><td>${esc(r.list)}</td><td>${ogCell(r)}</td><td class="r num">${r.snap_share == null ? "–" : Math.round(r.snap_share*100) + "%"}</td></tr>${espnRow(r, 5)}`).join("")}
       </tbody></table></div></details>` : "")
     + (av.other.length ? `<details class="more"><summary>${av.other.length} more on the injury report</summary>
       <div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Pos</th><th>Status</th><th>Injury</th><th>When</th><th class="r">Snaps</th></tr></thead><tbody>
-      ${av.other.map(r => `<tr><td>${esc(r.player_name)}</td><td>${esc(r.position)}</td><td>${esc(r.report_status || "Limited practice")}</td><td>${esc(r.injury || "")}</td><td>${ogCell(r)}</td><td class="r num">${r.snap_share == null ? "–" : Math.round(r.snap_share*100) + "%"}</td></tr>`).join("")}
-      </tbody></table></div></details>` : "");
+      ${av.other.map(r => `<tr><td>${esc(r.player_name)}</td><td>${esc(r.position)}</td><td>${esc(r.report_status || "Limited practice")}</td><td>${esc(r.injury || "")}</td><td>${ogCell(r)}</td><td class="r num">${r.snap_share == null ? "–" : Math.round(r.snap_share*100) + "%"}</td></tr>${espnRow(r, 6)}`).join("")}
+      </tbody></table></div></details>` : "")
+    + espnOnlyBlock(av, t);
   return `<div class="block"><h4>${t} ${NAMES[t] || ""}</h4>
-    <p class="notice">${esc(note)} ${esc(injSourceText(av))} Depth chart is this team's Week 1 lineup (set ${esc(av.snapshot)}), so you can see how much it's changed -- current status is layered on top of each opening-week slot, not swapped in for it.</p>
+    <p class="notice">${esc(note)} ${esc(injSourceText(av))} Depth chart is this team's Week 1 lineup (set ${esc(av.snapshot)}), so you can see how much it's changed -- current status is layered on top of each opening-week slot, not swapped in for it. ESPN's "est. return" is ESPN's own estimate; for questionable players it's usually just the next game date.</p>
     ${hurtLastGameBlock(av)}
     <h3 class="sec-h" style="margin-top:10px">Not fully available</h3>${hurtCards(av, false)}
     ${extra}
@@ -1056,15 +1204,153 @@ function renderWeek(){
       <p><b>Points estimate</b> is the simple average of the two scoring rows, compared with the total. It isn't a model.</p>
       <p><b>Weather</b> is the kickoff-hour forecast from Open-Meteo, refreshed with the board. "Updated" is when it was fetched, and how far ahead of kickoff: forecasts a day out are far more reliable than ones a week out. A game is flagged at ${D.weather_flags?.wind ?? 15}+ mph wind or a ${D.weather_flags?.rain ?? 50}%+ chance of rain.</p>
       <p><b>Details ›</b> opens the game page: game logs, an EPA matchup (total, pass and rush), roster and depth chart with injuries, and full ATS and O/U splits.</p>
-      <p><b>Injury timing</b>: tap a tagged player on the Roster tab. "Hurt in the Week 5 game" comes straight from the play-by-play, including whether he returned. Anything else is inferred from when he first appeared on a list. "First listed this week" without a game injury usually means practice, illness or a hit the charting missed. "Status last changed" is the board refresh that first saw his current listing, so it's only as precise as the refresh schedule. nflverse's own update time for the injury file is shown with each team.</p>
+      <p><b>ESPN injury news</b>: the + icon at the top pulls ESPN's injury list (free, separate from the lines icon, so it never uses odds credits). It also loads when the page opens. Each injured player shows ESPN's status, injury, estimated return, when ESPN last updated him, and ESPN's latest note. A dashed tag means ESPN lists him but the official report gives him no game status. Starter counts and Pick write-ups still use the official report.</p>
+      <p><b>Injury timing</b>: tap a tagged player on the Roster/Injuries tab. "Hurt in the Week 5 game" comes straight from the play-by-play, including whether he returned. Anything else is inferred from when he first appeared on a list. "First listed this week" without a game injury usually means practice, illness or a hit the charting missed. "Status last changed" is the board refresh that first saw his current listing, so it's only as precise as the refresh schedule. nflverse's own update time for the injury file is shown with each team.</p>
       <p>Tiles start condensed -- teams, kickoff, spread, and each team's last 3 games ATS and O/U. Tap <b>More ▼</b> for the full matchup breakdown. The last-3 records are colored: <b>blue</b> for covers (ATS) or overs (O/U), <b>orange</b> for misses or unders. Solid means a 2+ game lead like 3-0, light means 2-1, plain means even. Three games is a tiny sample, so treat the colors as a pointer, not a signal.</p>
       <p>Next week's slate joins the board from Wednesday on; the week switcher above also holds every finished week's results once its games are done.</p>
       ${anyStale ? `<p>This week's injury reports aren't all out yet (teams file Wednesday to Friday), so some hurt-starter counts use last week's report.</p>` : ""}
       <p><b>Depth chart and injuries</b> is frozen to each team's Week 1 lineup, not today's reshuffled one -- so a Week 1 starter who's since been hurt, benched or has left the team entirely still shows in their opening slot, tagged with what's happened to them. That's on purpose: it's the easiest way to see how much a roster has actually been depleted since the season started. A <b>GONE</b> tag means the player is no longer on this team's roster at all (released, retired, or traded), which the injury report alone won't tell you.</p>
     </div></details>
-    ${byDay.map(d => `<section class="day"><h3>${fmtDate(d.date, d.weekday)}</h3><div class="tiles-grid">${d.games.map(gameTile).join("")}</div></section>`).join("")}
-    <p class="foot">Kickoff times are Eastern. Data: nflverse (schedules, lines, play-by-play, depth charts, injuries) and Open-Meteo (weather). Results through ${esc(D.results_through)}. Lines update with each refresh, so check current prices at your sportsbook before betting.</p>
+    <div class="seg boardsw" role="group" aria-label="Board">
+      <button type="button" data-board="lines" aria-pressed="${state.board !== "props"}">Game lines</button>
+      <button type="button" data-board="props" aria-pressed="${state.board === "props"}">Player props</button>
+    </div>
+    ${state.board === "props" ? `<p class="pnote">${PROPS_NOTE}</p>` : ""}
+    ${byDay.map(d => `<section class="day"><h3>${fmtDate(d.date, d.weekday)}</h3><div class="tiles-grid">${d.games.map(state.board === "props" ? propsTile : gameTile).join("")}</div></section>`).join("")}
+    <p class="foot">Kickoff times are Eastern. Data: nflverse (schedules, lines, play-by-play, depth charts, injuries, player stats), ESPN (injury news), PropLine (player props) and Open-Meteo (weather). Results through ${esc(D.results_through)}. Lines update with each refresh, so check current prices at your sportsbook before betting.</p>
   `;
+}
+
+/* ---------------------------- Player props -----------------------------
+   Lines: PropLine through the odds Worker (worker/props.js), one per player
+   and market: DraftKings' main line, else the line most books deal.
+   History: the player's real games this season and last (nflverse; a game he
+   played without the stat counts as 0) against TODAY'S line. It is not a
+   record against past lines -- PropLine's free plan has none.
+   The rates use the same rule as queries.prop_hit_rates (Agresti-Coull
+   margin; "signal" needs 10+ games and Over % farther from 50 than the ±). */
+const PROPS_NOTE = `How often today's line would have cashed in his past games (this season and last; a game he played without the stat counts as 0). It isn't a record against past lines. Each rate shows over-unders, n and a ± margin; "signal" needs 10+ games and a gap from 50% bigger than the ±. Lines: ${esc(D.odds_book)}, else the line most books deal.`;
+const PROP_SHORT = {player_pass_yds: "Pass yds", player_pass_tds: "Pass TDs", player_pass_completions: "Completions",
+  player_pass_attempts: "Pass att", player_pass_interceptions: "INTs thrown", player_rush_yds: "Rush yds",
+  player_rush_attempts: "Rush att", player_receptions: "Receptions", player_reception_yds: "Rec yds",
+  player_rush_reception_yds: "Rush+rec yds", player_pass_rush_yds: "Pass+rush yds", player_anytime_td: "Anytime TD"};
+const PROP_ORDER = Object.keys(PROP_SHORT);
+const PROP_GROUPS = [["all", "All"], ["pass", "Passing"], ["rush", "Rushing"], ["rec", "Receiving"], ["td", "TDs"]];
+const propGroup = m => m === "player_anytime_td" || m === "player_pass_tds" ? "td"
+  : m.startsWith("player_pass") ? "pass" : m.startsWith("player_rush") ? "rush" : "rec";
+const isAnytime = m => m === "player_anytime_td";
+const price = v => v == null ? "" : v > 0 ? `+${v}` : `${minus}${-v}`;
+
+// Each player's game-log values by market, so a live pull can add, drop or move lines freely.
+for (const W of D.weeks) for (const g of W.games) for (const pl of g.props?.players || []){
+  pl.vals = Object.fromEntries(pl.ps.map((x, i) => [x.m, pl.log.map(r => r[4 + i])]));
+}
+// Same math as queries.prop_margin_of_error / prop_hit_rates.
+function propMoe(o, u){ const n = o + u; if (!n) return null; const p = (o + 2) / (n + 4); return 1.96 * Math.sqrt(p * (1 - p) / (n + 4)) * 100; }
+function propRates(vals, line){
+  const o = vals.filter(v => v > line).length, u = vals.filter(v => v < line).length, n = o + u;
+  const pct = n ? o / n * 100 : null, moe = propMoe(o, u);
+  return {o, u, p: vals.length - n, n, pct: pct == null ? null : Math.round(pct * 10) / 10,
+          moe: moe == null ? null : Math.round(moe * 10) / 10, sig: pct != null && n >= 10 && Math.abs(pct - 50) > moe};
+}
+function propWindows(pl, m, line){
+  const v = pl.vals?.[m]; if (!v || !v.length) return null;
+  const rows = pl.log;
+  const out = {
+    l5: propRates(v.slice(0, 5), line), l10: propRates(v.slice(0, 10), line),
+    now: propRates(v.filter((_, k) => rows[k][2] === D.season), line),
+    prior: propRates(v.filter((_, k) => rows[k][2] === D.season - 1), line),
+    opp: propRates(v.filter((_, k) => pl.op && rows[k][1] === pl.op), line),
+  };
+  const t = v.slice(0, 10), s2 = [...t].sort((a, b) => a - b);
+  out.avg = Math.round(t.reduce((a, b) => a + b, 0) / t.length * 10) / 10;
+  out.med = (s2[Math.floor((s2.length - 1) / 2)] + s2[Math.floor(s2.length / 2)]) / 2;
+  return out;
+}
+function hchip(label, r, m){
+  if (!r || !r.n) return `<span class="hchip" title="No games"><small>${esc(label)}</small>–</span>`;
+  const cls = r.pct >= 60 ? "ov" : r.pct <= 40 ? "un" : "";
+  const what = isAnytime(m) ? `scored in ${r.o} of ${r.n}` : `${r.o} over, ${r.u} under${r.p ? `, ${r.p} push` : ""}`;
+  return `<span class="hchip ${cls} ${r.sig ? "sig" : ""}" title="${esc(`${label}: ${what} (${Math.round(r.pct)}% over, n=${r.n}, ±${Math.round(r.moe)})${r.sig ? " · signal" : ""}`)}"><small>${esc(label)}</small><span class="num">${r.o}-${r.u}</span>${r.sig ? " ·sig" : ""}</span>`;
+}
+function lineText(x){
+  return isAnytime(x.m) ? `Yes ${price(x.o)}` : `O/U ${x.pt}`;
+}
+function playerTag(pl){
+  const p = pl.e && (currentWeek().avail?.[pl.t]?.depth || []).find(d => d.e === pl.e);
+  return p ? pillFor(p) : "";
+}
+function propsOf(g){ return g.props?.players || []; }
+
+// This week (props view): a few headline props per team, then "All props ›".
+function propsTile(g){
+  const when = `${(g.weekday || "").slice(0, 3)} ${fmtKick(g.time)} ET`;
+  const head = `<a class="ghead" href="#game=${g.id}&tab=props"><span class="gteams">${teamsLine(g)}</span>
+    <span class="gmeta"><span>${esc(when)}</span><span class="more-link">Props ›</span></span></a>`;
+  const players = propsOf(g);
+  if (!players.length) return `<article class="gtile ptile" id="g-${g.id}">${head}<p class="meta" style="margin:6px 0 0">No player props posted for this game yet.</p></article>`;
+  const pick = (t, m, k) => players.filter(pl => pl.t === t).map(pl => [pl, pl.ps.find(x => x.m === m)]).filter(([, x]) => x)
+    .sort((a, b) => b[1].pt - a[1].pt).slice(0, k);
+  const team = t => {
+    const rows = [...pick(t, "player_pass_yds", 1), ...pick(t, "player_rush_yds", 1), ...pick(t, "player_reception_yds", 2)];
+    return `<div class="pteam">${logo(t)} ${t}</div>${rows.length ? rows.map(([pl, x]) => {
+      const w = propWindows(pl, x.m, x.pt);
+      return `<div class="prow-s"><span class="nm">${esc(pl.n)}${playerTag(pl)} <span class="soft">${esc(PROP_SHORT[x.m])}</span></span>
+        <span class="num">${esc(lineText(x))}</span>${hchip("L10", w?.l10, x.m)}</div>`;
+    }).join("") : `<p class="meta" style="margin:2px 0">No yardage props yet.</p>`}`;
+  };
+  return `<article class="gtile ptile" id="g-${g.id}">${head}${team(g.away)}${team(g.home)}</article>`;
+}
+
+function propRowDetail(pl, x){
+  const v = pl.vals?.[x.m] || [];
+  if (!v.length) return `<div class="pdetail"><p class="meta">No game log for this player (not matched to nflverse, or no games this season or last).</p></div>`;
+  const last = v.slice(0, 10).reverse(), rows = pl.log.slice(0, 10).reverse();
+  const top = Math.max(x.pt * 1.6, ...last, 1);
+  const bars = last.map((val, k) => `<i class="${val > x.pt ? "ov" : val < x.pt ? "un" : "pu"}" style="height:${Math.max(3, val / top * 100)}%" title="${esc(`${rows[k][0]} vs ${rows[k][1] || "?"}: ${val}`)}"></i>`).join("");
+  const w = propWindows(pl, x.m, x.pt);
+  const log = pl.log.slice(0, 12).map((r, k) => {
+    const val = v[k], res = val > x.pt ? "Over" : val < x.pt ? "Under" : "Push";
+    return `<tr><td class="num">${esc(r[0].slice(5).replace("-", "/"))}</td><td>${esc(r[1] || "–")}</td><td class="r num">${val}${r[3] ? "*" : ""}</td><td class="${res === "Over" ? "res-o" : res === "Under" ? "res-u" : ""}">${isAnytime(x.m) ? (val > 0 ? "Scored" : "No TD") : res}</td></tr>`;
+  }).join("");
+  return `<div class="pdetail">
+    <div class="pbars" aria-label="Last ${last.length} games, oldest to newest">${bars}<span class="pline-mark" style="bottom:${x.pt / top * 100}%"></span></div>
+    <p class="meta" style="margin:2px 0 6px">Last ${last.length} games, oldest to newest; dashed line = ${x.pt}. Average ${w.avg}, median ${w.med}.</p>
+    <div class="tbl-wrap"><table class="plog"><thead><tr><th>Date</th><th>Opp</th><th class="r">${esc(x.l || PROP_SHORT[x.m])}</th><th>vs ${x.pt}</th></tr></thead><tbody>${log}</tbody></table></div>
+    ${pl.log.some(r => r[3]) ? `<p class="meta" style="margin:4px 0 0">* played (snap counts) but recorded no stat, counted as 0.</p>` : ""}
+  </div>`;
+}
+function propCard(g, pl){
+  const ps = pl.ps.filter(x => state.propFilter === "all" || propGroup(x.m) === state.propFilter)
+    .sort((a, b) => PROP_ORDER.indexOf(a.m) - PROP_ORDER.indexOf(b.m));
+  if (!ps.length) return "";
+  return `<div class="pcard"><div class="pc-h"><span><b>${esc(pl.n)}</b>${playerTag(pl)}</span><span class="soft num">${esc([pl.pos, pl.t].filter(Boolean).join(" · "))}</span></div>
+    ${ps.map(x => {
+      const key = `${g.id}|${pl.n}|${x.m}`, open = state.propOpen.has(key);
+      const w = propWindows(pl, x.m, x.pt);
+      const chips = w ? [hchip("L5", w.l5, x.m), hchip("L10", w.l10, x.m), hchip(String(D.season), w.now, x.m),
+        hchip(String(D.season - 1), w.prior, x.m), pl.op ? hchip("vs " + pl.op, w.opp, x.m) : ""].join("")
+        : `<span class="meta">No game log</span>`;
+      return `<button type="button" class="prow" data-prow="${esc(key)}" aria-expanded="${open}">
+        <span class="pl">${esc(PROP_SHORT[x.m] || x.l)}</span>
+        <span class="pline num">${esc(lineText(x))}<small>${isAnytime(x.m) ? "" : `${price(x.o)}/${price(x.u)} · `}${x.bk === "DraftKings" ? "DK" : "most books"}</small></span>
+        <span class="pchips">${chips}</span></button>${open ? propRowDetail(pl, x) : ""}`;
+    }).join("")}</div>`;
+}
+function propsPane(g){
+  const players = propsOf(g);
+  const at = g.props?.at;
+  if (!players.length) return `<p class="meta">No player props posted for this game yet. PropLine usually lists them a few days before kickoff; use the props button in the refresh strip to check again.</p>`;
+  const team = t => {
+    const list = players.filter(pl => pl.t === t);
+    const cards = list.map(pl => propCard(g, pl)).filter(Boolean);
+    return `<h3 class="pteam-h">${logo(t)}${t} ${NAMES[t] || ""}</h3>${cards.length ? `<div class="pgrid">${cards.join("")}</div>` : `<p class="meta">No ${state.propFilter === "all" ? "" : PROP_GROUPS.find(x => x[0] === state.propFilter)[1].toLowerCase() + " "}props for ${t}.</p>`}`;
+  };
+  const other = players.filter(pl => pl.t !== g.away && pl.t !== g.home);
+  return `<p class="pnote">${PROPS_NOTE}${at ? ` Lines as of ${esc(fmtStamp(at))}.` : ""} Tap a prop for his game log.</p>
+    <div class="seg pfilter" role="group" aria-label="Prop type">${PROP_GROUPS.map(([k, l]) => `<button type="button" data-pfilter="${k}" aria-pressed="${state.propFilter === k}">${l}</button>`).join("")}</div>
+    ${team(g.away)}${team(g.home)}
+    ${other.length ? `<h3 class="pteam-h">Not matched to a team</h3><div class="pgrid">${other.map(pl => propCard(g, pl)).join("")}</div>` : ""}`;
 }
 
 /* ---------------------------- Game page ----------------------------- */
@@ -1072,7 +1358,7 @@ function parseRoute(){
   const p = new URLSearchParams(location.hash.slice(1));
   return {game: p.get("game"), tab: p.get("tab") || "logs"};
 }
-const GTABS = [["logs", "Game logs"], ["matchup", "Matchup"], ["roster", "Roster"], ["ats", "ATS"], ["ou", "O/U"], ["pick", "Pick"]];
+const GTABS = [["logs", "Game logs"], ["matchup", "Matchup"], ["roster", "Roster/<wbr>Injuries"], ["props", "Props"], ["ats", "ATS"], ["ou", "O/U"], ["pick", "Pick"]];
 
 /* ----------------------------------------------------------------------
    Pick write-up: a 5-8 sentence case FOR one bet, built from numbers
@@ -1343,7 +1629,11 @@ function logsPane(t){
 
 const TAG_TEXT = {out: "Out", doubtful: "Doubtful", questionable: "Questionable", limited: "Limited practice", gone: "Off roster"};
 function tagFor(p){
-  if (p.x === "active") return "";
+  if (p.x === "active"){
+    // No official game status but on ESPN's list: ESPN's tag, dashed underline.
+    const x = espnOf(p);
+    return x && x.s !== "Active" ? `<span class="tag ${espnBucket(x.s)} esp" title="${esc("ESPN: " + x.s)}">${esc(ESPN_SHORT[x.s] || x.s.split(" ")[0].toUpperCase())}</span>` : "";
+  }
   const label = p.x === "gone" ? "GONE" : p.x === "out" ? (SHORT[p.rs] || "OUT") : p.x === "doubtful" ? "D" : p.x === "questionable" ? "Q" : "LP";
   return `<span class="tag ${p.x}">${label}</span>`;
 }
@@ -1366,7 +1656,7 @@ function depthGrid(t, side){
       if (!p) return `<div class="dc ${i ? "" : "st"}"><span class="soft">–</span></div>`;
       const key = `${t}|${p.p}|${p.n}`;
       if (key === sel){ selP = p; selDepth = ["starter", "2nd", "3rd", "4th"][i]; }
-      const inner = p.x === "active"
+      const inner = p.x === "active" && !espnListed(p)
         ? `<span>${esc(p.n)}</span>`
         : `<button type="button" class="dbtn ${key === sel ? "on" : ""}" data-dsel="${esc(key)}">${esc(p.n)} ${tagFor(p)}</button>`;
       return `<div class="dc ${i ? "" : "st"}">${inner}</div>`;
@@ -1381,9 +1671,10 @@ function depthGrid(t, side){
     if (selP.rs && !SHORT[selP.rs] && selP.rs !== TAG_TEXT[selP.x] && !selP.inj) bits.push(esc(selP.rs));
     if (selP.sh != null) bits.push(`${Math.round(selP.sh * 100)}% of snaps (${esc(selP.sb)})`);
     if (selP.rp) bits.push(`next up ${esc(selP.rp)}${selP.rsh != null ? ` (${Math.round(selP.rsh * 100)}% of snaps)` : ""}`);
-    const tagWord = selP.x === "out" ? (selP.rs || "Out") : TAG_TEXT[selP.x];
-    return `<div class="dsel ${selP.x}"><div class="dsel-h"><b>${esc(selP.n)} <small class="num">${esc(selP.p)} · ${selDepth}</small></b><span class="tagword">${esc(tagWord)}</span></div>
+    const tagWord = selP.x === "out" ? (selP.rs || "Out") : selP.x === "active" ? "No official game status" : TAG_TEXT[selP.x];
+    return `<div class="dsel ${selP.x === "active" ? espnBucket(espnOf(selP)?.s) : selP.x}"><div class="dsel-h"><b>${esc(selP.n)} <small class="num">${esc(selP.p)} · ${selDepth}</small></b><span class="tagword">${esc(tagWord)}</span></div>
       <div>${bits.join(" · ") || "No other details on the report."}</div>
+      ${espnBlock(selP)}
       ${selP.og ? `<div class="origin ${selP.og.k}">${esc(originText(selP.og))}</div>` : ""}
       ${selP.fs ? `<div class="soft">${esc(seenText(selP))}</div>` : ""}
       <button type="button" class="linkish" data-dsel="">Close</button></div>`;
@@ -1398,31 +1689,56 @@ function depthGrid(t, side){
     <p class="meta pad">Swipe the table for 2nd–4th. Tap a tagged player for injury details.</p>
   </div>`;
 }
-function changesBox(t){
-  const c = D.teamx?.[t]?.changes;
-  if (!c) return "";
-  const pct = v => v == null ? "" : `${Math.round(v * 100)}%`;
-  const newTxt = n => n.how === "added" ? `was ${n.from} · ${pct(n.share)} of snaps` : n.how === "promoted" ? `promoted · was ${pct(n.share)}` : "no 2025 NFL snaps";
-  const person = (x, label) => !x.now ? "–" : `${esc(x.now)} ${x.changed ? `<b class="chg">new · was ${esc(x.prior)}</b>` : `<span class="soft">(same as ${D.season - 1})</span>`}`;
-  const whereCls = w => w.startsWith("now ") || w === "not on a roster" ? "gone" : "";
-  return `<div class="card changes">
-    <h4>Key changes vs ${D.season - 1}</h4>
-    <p>${c.new_starters.length} of ${c.starters} starting spots changed since ${D.season - 1}${c.qb.changed || c.coach.changed ? ", including the " + [c.qb.changed ? "quarterback" : "", c.coach.changed ? "head coach" : ""].filter(Boolean).join(" and ") : ""}. Last season's records were built with a different lineup.</p>
-    <div class="kv"><span class="soft">QB</span><span>${person(c.qb)}</span><span class="soft">Coach</span><span>${person(c.coach)}</span></div>
-    <h5>New starters</h5>
-    ${c.new_starters.length ? c.new_starters.map(n => `<div class="chrow"><span class="num soft">${esc(n.pos)}</span><span class="nm">${esc(n.name)}</span><span class="soft r">${newTxt(n)}</span></div>`).join("") : `<p class="meta">Same starters as last season.</p>`}
-    <h5>Gone from ${D.season - 1}'s starting lineup</h5>
-    ${c.lost_starters.length ? c.lost_starters.map(n => `<div class="chrow"><span class="num soft">${esc(n.pos)}</span><span class="nm">${esc(n.name)} <small class="num soft">${pct(n.share)}</small></span><span class="r ${whereCls(n.where)}">${esc(n.where)}</span></div>`).join("") : `<p class="meta">Every 50%+ snap player from last season is still starting.</p>`}
-    <p class="meta">Starters come from the latest depth chart; "starter last season" means 50%+ of snaps over 6+ games. Name matching between data sources can occasionally miss a player.</p>
+/* Roster / Injuries tab: both teams on one page. A summary of hurt starters
+   first, then each team's Week 1 depth chart with current status overlaid. */
+const SEVERITY = {out: 0, doubtful: 1, questionable: 2};
+function keyInjured(av){
+  // Starters with an official game status (out / doubtful / questionable,
+  // reserve lists count as out), plus starters only ESPN lists so far.
+  return (av?.depth || []).filter(p => p.st && (p.x in SEVERITY || (p.x !== "gone" && espnListed(p))))
+    .sort((a, b) => ((SEVERITY[a.x] ?? 3) - (SEVERITY[b.x] ?? 3)) || ((b.sh ?? 0) - (a.sh ?? 0)));
+}
+function keyInjuredRow(p){
+  const x = espnOf(p);
+  const official = p.x === "out" ? (p.rs || "Out") : p.x in SEVERITY ? TAG_TEXT[p.x] : null;
+  const what = [official, p.inj && !/^Not injury related/i.test(p.inj) ? p.inj : null].filter(Boolean).join(" · ");
+  // ESPN adds only what the official line doesn't already say.
+  const sameStatus = official && x && official.toLowerCase() === x.s.toLowerCase();
+  const espn = x && x.s !== "Active" ? [sameStatus ? null : `ESPN: ${x.s}`, x.i && x.i !== x.s && !p.inj ? x.i : null,
+    x.ret ? `est. return ${fmtDay(x.ret)}` : null].filter(Boolean).join(", ") : "";
+  return `<div class="kir ${p.x in SEVERITY ? p.x : espnBucket(x?.s)}">
+    <div class="kir-top"><span><b>${esc(p.n)}</b>${pillFor(p)}</span><span class="soft num">${esc(p.p)}${p.sh != null ? ` · ${Math.round(p.sh * 100)}% snaps` : ""}</span></div>
+    ${what || espn ? `<div class="kir-det">${esc([what, espn].filter(Boolean).join(" · "))}</div>` : ""}
+    ${p.rp ? `<div class="kir-det soft">Next up: ${esc(p.rp)}${p.rsh != null ? ` (${Math.round(p.rsh * 100)}% snaps)` : ""}</div>` : ""}
   </div>`;
 }
-function rosterPane(t){
+function keyInjuredCard(g){
+  const W = currentWeek();
+  const col = (t, side) => {
+    const list = keyInjured(W.avail?.[t]);
+    return `<div><h5 class="kir-h">${logo(t)}${t} <span class="soft">${side} · ${list.length} starter${list.length === 1 ? "" : "s"} hurt</span></h5>
+      ${list.length ? list.map(keyInjuredRow).join("") : `<p class="meta">No starters hurt.</p>`}</div>`;
+  };
+  return `<div class="card kir-card"><h4>Key injured starters</h4>
+    <div class="pair">${col(g.away, "away")}${col(g.home, "home")}</div>
+    <p class="meta">Starters on this week's official report (or a reserve list), plus starters only ESPN lists so far (dashed tag), most serious and most-used first. Tap a tagged player below for the full injury details and ESPN's notes.</p>
+  </div>`;
+}
+function teamRoster(t, side){
   const av = currentWeek().avail?.[t];
   const note = !av ? "" : av.report_week == null ? "No injury report has been filed yet this season."
     : av.current ? `Week ${av.report_week} injury report.`
     : `The week ${av.week} injury report isn't out yet (teams file Wednesday to Friday), so tags come from week ${av.report_week}.`;
-  return `${changesBox(t)}${av ? hurtLastGameBlock(av) : ""}${depthGrid(t, "O")}${depthGrid(t, "D")}
-    <p class="meta">${note} ${esc(injSourceText(av))} Tags: Q questionable, D doubtful, OUT, IR injured reserve, PUP / NFI other reserve lists, RES other reserve list, LP limited practice, GONE no longer on this team's roster. Slots are frozen to this team's Week 1 depth chart (${esc(av?.snapshot || "")}) so you can see how far it's been depleted; current status is overlaid on each slot.</p>`;
+  return `<section class="team-roster">
+    <h3 class="team-h">${logo(t)}${t} ${NAMES[t] || ""} <span class="soft">${side}</span></h3>
+    <p class="meta tight">${esc(note)} ${esc(injSourceText(av))}</p>
+    ${av ? hurtLastGameBlock(av) : ""}${depthGrid(t, "O")}${depthGrid(t, "D")}${av ? espnOnlyBlock(av, t) : ""}
+  </section>`;
+}
+function rosterPane(g){
+  const snap = currentWeek().avail?.[g.away]?.snapshot || "";
+  return `${keyInjuredCard(g)}${teamRoster(g.away, "away")}${teamRoster(g.home, "home")}
+    <p class="meta">Tags: Q questionable, D doubtful, OUT, IR injured reserve, PUP / NFI other reserve lists, RES other reserve list, LP limited practice, GONE no longer on this team's roster. A dashed underline means ESPN lists the player but the official report gives no game status. ESPN's "est. return" is its own estimate; for questionable players it's usually just the next game date. Slots are frozen to each team's Week 1 depth chart (${esc(snap)}) so you can see how far it's been depleted; current status is overlaid on each slot.</p>`;
 }
 function splitCell(x, right){
   if (!x || !x.n) return `<span class="c ${right ? "r" : "l"} stack2"><span class="num">–</span><small class="soft">no games</small></span>`;
@@ -1474,7 +1790,8 @@ function renderGame(g, tab){
   const pane = tab === "logs" ? teamSwitch(g, team) + logsPane(team)
     : tab === "matchup" ? matchupPane(g)
     : tab === "pick" ? pickPane(g)
-    : tab === "roster" ? teamSwitch(g, team) + rosterPane(team)
+    : tab === "roster" ? rosterPane(g)
+    : tab === "props" ? propsPane(g)
     : splitsPane(g, tab);
   app.innerHTML = `<div class="gpage">
     <div class="ghero">
@@ -1548,8 +1865,82 @@ function render(){
   (state.view === "teams" ? renderTeams : renderWeek)();
 }
 
-document.getElementById("stamp").textContent =
-  `${D.season} · results through ${new Date(D.results_through + "T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"})} · updated ${new Date(D.generated).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}`;
+/* ----------------------------------------------------------------------
+   Refresh status strip: when each data source was last refreshed.
+   - Full app: the scheduled GitHub Actions build (D.generated).
+   - Game lines: the last live pull through the odds Worker in this browser,
+     with The Odds API credits left this month as of that pull (the Worker
+     passes on the API's x-requests-remaining header). Before any pull the
+     lines are the ones from the full refresh (nflverse).
+   - Player props: the last live PropLine pull (through the Worker) in this
+     browser, else the scheduled refresh's; with PropLine requests left today.
+   - Injuries: the live ESPN pull, plus the official report's week.
+   Dot: green = fresh, yellow = older than expected or limited, red = the
+   last try failed, grey = not pulled yet.
+   ---------------------------------------------------------------------- */
+const STATUS = {lines: null, linesMatched: 0, linesErr: null, injErr: null, credits: null, props: null, propsErr: null};
+function fmtWhen(iso){
+  const d = new Date(iso); if (!iso || isNaN(d)) return "–";
+  const t = d.toLocaleTimeString(undefined, {hour: "numeric", minute: "2-digit"});
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 864e5);
+  return days === 0 ? `Today ${t}` : days === 1 ? `Yesterday ${t}` : `${d.toLocaleDateString(undefined, {month: "short", day: "numeric"})}, ${t}`;
+}
+const hoursSince = iso => (Date.now() - new Date(iso)) / 36e5;
+function setRow(id, cls, html, title){
+  const row = document.getElementById(id);
+  row.classList.remove("fresh", "stale", "err"); if (cls) row.classList.add(cls);
+  const v = row.querySelector(".rs-v"); v.innerHTML = html; v.title = title || "";
+}
+function renderStatus(){
+  const thru = new Date(D.results_through + "T12:00:00").toLocaleDateString(undefined, {month: "short", day: "numeric"});
+  // Scheduled runs: Mon-Fri once a day, Sunday four times. Fri -> Sun is the longest gap (~40 h).
+  setRow("rs-app", hoursSince(D.generated) > 42 ? "stale" : "fresh",
+    `<b>${esc(fmtWhen(D.generated))}</b><small>Scheduled refresh · results through ${esc(thru)}</small>`, fmtStamp(D.generated));
+
+  const L = STATUS.lines;
+  const fromMost = D.weeks.flatMap(w => w.games).filter(g => g.lineBook === "most books").length;
+  // This month's Odds API balance, as of the newest pull this browser has seen (STATUS.credits).
+  const C = STATUS.credits;
+  const credits = C ? `<b>${C.n}</b> credits remaining` : "Credits remaining show after your first ↻ pull";
+  const creditsTitle = C ? `Odds API credits remaining this month, as of the pull at ${fmtStamp(C.at)}.` : "";
+  if (!D.odds_url) setRow("rs-lines", null, `<b>From full refresh</b><small>Live lines are off</small>`);
+  else if (STATUS.linesErr) setRow("rs-lines", "err",
+    `<b>${L ? esc(fmtWhen(L.fetched_at)) : "From full refresh"}</b><small class="warn">Couldn't refresh: ${esc(STATUS.linesErr)}</small><small>${credits}</small>`, creditsTitle);
+  else if (!L) setRow("rs-lines", null, `<b>From full refresh</b><small>${credits}</small>`, creditsTitle);
+  else {
+    const extra = [fromMost ? `${fromMost} game${fromMost > 1 ? "s" : ""} from most books` : "",
+                   STATUS.linesMatched ? "" : "no games matched", L.note || ""].filter(Boolean).join(" · ");
+    setRow("rs-lines", L.note || hoursSince(L.fetched_at) > 3 ? "stale" : "fresh",
+      `<b>${esc(fmtWhen(L.fetched_at))}</b><small>${credits}${L.pulls_today != null ? ` · ${L.pulls_today} of 12 pulls today` : ""}</small>`
+      + (extra ? `<small class="${L.note ? "warn" : ""}">${esc(extra)}</small>` : ""),
+      `${D.odds_book} lines pulled ${fmtStamp(L.fetched_at)}. ${creditsTitle}`);
+  }
+
+  const P = STATUS.props;
+  const bakedAt = D.weeks.flatMap(w => w.games).map(g => g.props?.at).filter(Boolean).sort().pop();
+  const withProps = D.weeks.flatMap(w => w.games).filter(g => !g.final && g.props?.players?.length).length;
+  const left = P?.remaining != null ? `${P.remaining} PropLine requests left today` : "";
+  if (!D.props_url) setRow("rs-props", null, `<b>Off</b><small>No props relay set</small>`);
+  else if (STATUS.propsErr) setRow("rs-props", "err",
+    `<b>${esc(fmtWhen(P?.at || bakedAt))}</b><small class="warn">Couldn't refresh: ${esc(STATUS.propsErr)}</small>`);
+  else if (P) setRow("rs-props", P.note ? "stale" : "fresh",
+    `<b>${esc(fmtWhen(P.at))}</b><small>${P.games} game${P.games === 1 ? "" : "s"} with props${left ? " · " + esc(left) : ""}</small>${P.note ? `<small class="warn">${esc(P.note)}</small>` : ""}`,
+    `Live PropLine pull ${fmtStamp(P.at)} (the Worker reuses a game's pull for 15 minutes within 48 hours of kickoff, 3 hours before that).`);
+  else if (bakedAt) setRow("rs-props", hoursSince(bakedAt) > 12 ? "stale" : "fresh",
+    `<b>${esc(fmtWhen(bakedAt))}</b><small>From full refresh · ${withProps} game${withProps === 1 ? "" : "s"} with props · tap ↻ for live</small>`, fmtStamp(bakedAt));
+  else setRow("rs-props", null, `<b>None yet</b><small>Tap ↻ to pull from PropLine</small>`);
+
+  const av = Object.values((D.weeks.find(w => w.week === D.current_week) || D.weeks[0])?.avail || {})[0] || {};
+  const report = av.report_week != null ? `official report Wk ${av.report_week}${av.current ? "" : " (last week's)"}` : "no official report yet";
+  const nfl = av.inj_updated ? ` nflverse official report updated ${fmtStamp(av.inj_updated)}.` : "";
+  if (STATUS.injErr) setRow("rs-inj", "err", LIVE_INJ.byId
+    ? `<b>${esc(fmtWhen(LIVE_INJ.at))}</b><small class="warn">Refresh failed (${esc(STATUS.injErr)}); showing that earlier live pull</small>`
+    : `<b>${av.espn_at ? esc(fmtWhen(av.espn_at)) : "–"}</b><small class="warn">Live ESPN pull failed (${esc(STATUS.injErr)}); showing ESPN as of the full refresh</small>`, nfl.trim());
+  else if (LIVE_INJ.byId) setRow("rs-inj", "fresh", `<b>${esc(fmtWhen(LIVE_INJ.at))}</b><small>ESPN live · ${esc(report)}</small>`,
+    `ESPN injury list pulled ${fmtStamp(LIVE_INJ.at)}.${nfl}`);
+  else if (D.espn_injuries_url) setRow("rs-inj", null, `<b>Loading…</b><small>ESPN live · ${esc(report)}</small>`);
+  else setRow("rs-inj", null, `<b>${esc(fmtWhen(D.generated))}</b><small>${esc(report)}</small>`);
+}
 
 /* ----------------------------------------------------------------------
    Live lines: the refresh button asks the Cloudflare Worker (worker/odds.js)
@@ -1559,8 +1950,8 @@ document.getElementById("stamp").textContent =
    (ties go to the line nearest the median). The model gap is recomputed
    against the new line exactly as queries.model_lines does it:
    gap = model - market, + = home / over.
-   Nothing else is recomputed -- stats, trends and injuries stay as of the
-   last scheduled refresh.
+   Nothing else is recomputed -- stats and trends stay as of the last
+   scheduled refresh (injury news has its own + icon, refreshInjuries).
    ---------------------------------------------------------------------- */
 function consensus(vals){
   const v = vals.filter(x => typeof x === "number").sort((a, b) => a - b);
@@ -1604,25 +1995,22 @@ function applyLines(data){
   D.lines_at = data.fetched_at; D.lines_live = true;
   return n;
 }
-function linesStampText(data, n){
-  const fallback = D.weeks.flatMap(w => w.games).filter(g => g.lineBook === "most books").length;
-  return `${D.odds_book || "live"} lines, ${fmtStamp(data.fetched_at)}${fallback ? ` (${fallback} game${fallback > 1 ? "s" : ""} from most books)` : ""}${n ? "" : " (no games matched)"}${data.note ? " · " + data.note : ""}`;
-}
 async function refreshLines(){
-  const btn = document.getElementById("refresh"), out = document.getElementById("lines-stamp");
+  const btn = document.getElementById("refresh");
   btn.classList.add("busy"); btn.disabled = true;
   try {
     const r = await fetch(D.odds_url.replace(/\/$/, "") + "/odds", {cache: "no-store"});
     const data = await r.json();
     if (!r.ok || !data.events) throw new Error(data.error || `status ${r.status}`);
-    const n = applyLines(data);
-    out.textContent = linesStampText(data, n);
+    STATUS.linesMatched = applyLines(data); STATUS.lines = data; STATUS.linesErr = null;
+    if (data.remaining != null) STATUS.credits = {n: data.remaining, at: data.fetched_at};
     store.set("lines", data);
     const y = window.scrollY; render(); window.scrollTo(0, y);
   } catch (err){
-    out.textContent = `Couldn't refresh lines (${err.message}).`;
+    STATUS.linesErr = err.message;
   } finally {
     btn.classList.remove("busy"); btn.disabled = false;
+    renderStatus();
   }
 }
 if (D.odds_url){
@@ -1631,11 +2019,143 @@ if (D.odds_url){
   btn.addEventListener("click", refreshLines);
   // Reuse this viewer's last pull if it's newer than the build and under 12 hours old.
   const saved = store.get("lines", null);
+  // The credit balance is worth showing from any earlier pull, however old (it says when).
+  if (saved?.remaining != null) STATUS.credits = {n: saved.remaining, at: saved.fetched_at};
+  // Ask the Worker for the balance from anyone's latest pull. Free: /status
+  // only reads the Worker's storage, never The Odds API. A Worker without
+  // /status (not redeployed yet) answers 404, and the row just keeps the above.
+  fetch(D.odds_url.replace(/\/$/, "") + "/status", {cache: "no-store"})
+    .then(r => r.ok ? r.json() : null)
+    .then(s => {
+      if (s?.remaining == null || !s.at) return;
+      if (STATUS.credits && new Date(STATUS.credits.at) >= new Date(s.at)) return;
+      STATUS.credits = {n: s.remaining, at: s.at};
+      if (STATUS.lines && s.pulls_today != null) STATUS.lines.pulls_today = s.pulls_today;
+      renderStatus();
+    })
+    .catch(() => {});
   if (saved?.fetched_at && new Date(saved.fetched_at) > new Date(D.generated) && Date.now() - new Date(saved.fetched_at) < 12 * 3600e3){
-    const n = applyLines(saved);
-    document.getElementById("lines-stamp").textContent = linesStampText(saved, n);
+    STATUS.linesMatched = applyLines(saved); STATUS.lines = saved;
   }
 }
+
+/* ----------------------------------------------------------------------
+   Live injury news: the + icon pulls ESPN's league-wide injury list
+   (D.espn_injuries_url) straight from ESPN -- free, no key, and separate
+   from the lines icon, so it never spends Odds API credits. It also runs
+   once when the page opens. Each player is matched by ESPN id (`e` on every
+   board player), and the pull replaces the refresh-time listing (`es`) and
+   adds ESPN's notes. The notes live only in this browser tab: the published
+   page never stores ESPN's text. Official-report tags, starter counts and the
+   Pick write-ups still use the official report as of the scheduled refresh.
+   ---------------------------------------------------------------------- */
+function parseEspn(data){
+  const byId = new Map();
+  for (const team of data.injuries || []) for (const x of team.injuries || []){
+    const a = x.athlete || {};
+    const id = (a.links || []).map(l => /\/id\/(\d+)/.exec(l.href || "")?.[1]).find(Boolean);
+    const abbr = (a.team?.abbreviation || "").toUpperCase();
+    if (!id || !abbr || !x.status) continue;
+    const ret = x.details?.returnDate;
+    byId.set(id, {e: id, team: ESPN_TEAM[abbr] || abbr, n: a.displayName, p: a.position?.abbreviation,
+      s: x.status, i: espnInjury(x.details), ret: /^\d{4}-\d{2}-\d{2}/.test(ret || "") ? ret.slice(0, 10) : null,
+      up: x.date || null, sc: x.shortComment || null, lc: x.longComment || null});
+  }
+  return byId;
+}
+async function refreshInjuries(){
+  const btn = document.getElementById("inj-refresh");
+  btn.classList.add("busy"); btn.disabled = true;
+  try {
+    const r = await fetch(D.espn_injuries_url, {cache: "no-store"});
+    if (!r.ok) throw new Error(`status ${r.status}`);
+    const byId = parseEspn(await r.json());
+    if (!byId.size) throw new Error("empty list");
+    LIVE_INJ.byId = byId; LIVE_INJ.at = new Date().toISOString(); STATUS.injErr = null;
+    // Re-render only what shows injuries, so an open game list or Pick tab isn't reset.
+    if (document.querySelector(".hcard, .dtable, .espn, .injlist")){ const y = window.scrollY; render(); window.scrollTo(0, y); }
+  } catch (err){
+    STATUS.injErr = err.message;
+  } finally {
+    btn.classList.remove("busy"); btn.disabled = false;
+    renderStatus();
+  }
+}
+if (D.espn_injuries_url){
+  document.getElementById("inj-refresh").addEventListener("click", refreshInjuries);
+  refreshInjuries();
+} else document.getElementById("inj-refresh").hidden = true;
+
+/* ----------------------------------------------------------------------
+   Live player props: the props ↻ asks the Worker (worker/props.js) for the
+   game list, matches each upcoming game (same rule as live lines), then
+   pulls each game's props, four at a time. A player is matched by ESPN id,
+   else by name; his game log (from the scheduled refresh) stays, so the hit
+   rates are recomputed against the new line. A player the scheduled refresh
+   didn't have shows the line with no history. PropLine requests come out of
+   the Worker's free daily allowance (1,000), not the odds credits.
+   ---------------------------------------------------------------------- */
+function teamOfEspn(g, e){
+  for (const t of [g.away, g.home]) if ((currentWeek().avail?.[t]?.depth || []).some(d => d.e === e)) return t;
+  for (const W of D.weeks) for (const t of [g.away, g.home]) if ((W.avail?.[t]?.depth || []).some(d => d.e === e)) return t;
+  return null;
+}
+function applyProps(g, body){
+  const old = propsOf(g);
+  const byE = new Map(old.filter(pl => pl.e).map(pl => [pl.e, pl])), byN = new Map(old.map(pl => [pl.n.toLowerCase(), pl]));
+  const next = new Map();
+  for (const r of body.props || []){
+    const e = r.pid?.startsWith("espn:") ? r.pid.slice(5) : null;
+    const base = (e && byE.get(e)) || byN.get(r.n.toLowerCase());
+    const key = base ? base.n : r.n;
+    if (!next.has(key)){
+      const t = base?.t || (e && teamOfEspn(g, e)) || null;
+      next.set(key, base ? {...base, ps: []} : {n: r.n, t, op: t ? (t === g.home ? g.away : g.home) : null, pos: null, e, ps: [], log: [], vals: {}});
+    }
+    next.get(key).ps.push({m: r.m, l: PROP_SHORT[r.m] || r.m, pt: r.pt, o: r.o, u: r.u, bk: r.bk, nb: r.nb});
+  }
+  g.props = {at: body.fetched_at, players: [...next.values()]};
+}
+async function refreshProps(){
+  const btn = document.getElementById("props-refresh"), base = D.props_url.replace(/\/$/, "");
+  btn.classList.add("busy"); btn.disabled = true;
+  try {
+    const r = await fetch(base + "/props/events", {cache: "no-store"});
+    const list = await r.json();
+    if (!r.ok || !list.events) throw new Error(list.error || `status ${r.status}`);
+    // Games that have kicked off keep their last pregame lines (a pull now would be in-play prices).
+    const jobs = D.weeks.flatMap(w => w.games).filter(g => !g.final && kickoffMs(g) > Date.now()).map(g => [g, matchEvent(g, list.events)]).filter(([, e]) => e);
+    let games = 0, remaining = list.remaining, at = list.fetched_at, note = list.note || null, fails = 0;
+    for (let i = 0; i < jobs.length; i += 4){
+      await Promise.all(jobs.slice(i, i + 4).map(async ([g, e]) => {
+        try {
+          const rr = await fetch(`${base}/props/event/${encodeURIComponent(e.id)}`, {cache: "no-store"});
+          const body = await rr.json();
+          if (!rr.ok) throw new Error(body.error || rr.status);
+          if (body.props?.length){ applyProps(g, body); games++; }
+          if (body.remaining != null) remaining = remaining == null ? body.remaining : Math.min(remaining, body.remaining);
+          if (body.fetched_at && body.fetched_at > at) at = body.fetched_at;
+          if (body.note) note = body.note;
+        } catch { fails++; }
+      }));
+    }
+    if (!jobs.length) throw new Error("no upcoming games matched PropLine's list");
+    STATUS.props = {at, remaining, games, note: [note, fails ? `${fails} game${fails > 1 ? "s" : ""} failed` : ""].filter(Boolean).join(" · ") || null};
+    STATUS.propsErr = null;
+    if (document.querySelector(".ptile, .pcard, .pnote")){ const y = window.scrollY; render(); window.scrollTo(0, y); }
+  } catch (err){
+    STATUS.propsErr = err.message;
+  } finally {
+    btn.classList.remove("busy"); btn.disabled = false;
+    renderStatus();
+  }
+}
+if (D.props_url){
+  const btn = document.getElementById("props-refresh");
+  btn.hidden = false;
+  btn.addEventListener("click", refreshProps);
+}
+renderStatus();
 
 document.querySelector(".top .seg").addEventListener("click", e => {
   const b = e.target.closest("button[data-view]"); if (!b) return;
@@ -1696,6 +2216,12 @@ app.addEventListener("click", e => {
   if (w){ state.week = Number(w.dataset.week); store.set("week", state.week); render(); return; }
   const t = e.target.closest("button[data-team]");
   if (t){ state.team = t.dataset.team; store.set("team", state.team); render(); return; }
+  const bd = e.target.closest("button[data-board]");
+  if (bd){ state.board = bd.dataset.board; store.set("board", state.board); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+  const pf = e.target.closest("button[data-pfilter]");
+  if (pf){ state.propFilter = pf.dataset.pfilter; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+  const pr = e.target.closest("button[data-prow]");
+  if (pr){ const k = pr.dataset.prow; if (state.propOpen.has(k)) state.propOpen.delete(k); else state.propOpen.add(k); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const tb = e.target.closest("button[data-tab]");
   if (tb){
     state.tabs[tb.dataset.game] = tb.dataset.tab;

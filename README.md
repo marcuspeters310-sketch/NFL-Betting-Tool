@@ -22,6 +22,156 @@
   Flags: wind 15+ mph or 50%+ chance of rain (`config.py`). A failed fetch
   keeps the last good forecast.
 
+## Oct 16 additions: player props
+
+- **Where:** This week has a **Game lines / Player props** switch above the
+  tiles (remembered per browser). In props view each game tile shows a few
+  headline props per team (QB passing yards, top rusher, top two receivers)
+  with the last-10 record against today's line; **Props ›** opens the game
+  page's new **Props** tab. The game page has both: Props sits next to
+  Roster/Injuries, Game logs, ATS, O/U and Pick.
+- **Props tab:** every player PropLine lists for the game, by team, with a
+  filter (All / Passing / Rushing / Receiving / TDs). Each prop shows the
+  line, prices and book ("DK" or "most books"), then five history chips:
+  last 5, last 10, this season, last season, and vs this opponent, each as
+  overs-unders (title: %, n, ±). Tap a prop for a last-10 bar chart (blue
+  over, orange under, dashed line = today's line), average and median, and
+  his last 12 games. Injury tags from the depth chart show next to names.
+- **Markets:** passing yards / TDs / completions / attempts /
+  interceptions, rushing yards / attempts, receptions, receiving yards,
+  rush+rec yards, pass+rush yards, anytime TD (`queries.PROP_MARKETS`).
+- **Lines** come from PropLine's free plan (1,000 requests a day) through
+  the same Cloudflare Worker as the odds (`worker/props.js`, routes
+  `/props/events` and `/props/event/{id}`), which holds the PropLine key
+  as a secret. It picks one line per player and market: DraftKings' main
+  line (the one priced closest to even), else the line most books deal
+  (ties: nearest the median); "300+ yards" ladder rungs are ignored. It
+  reuses a game's pull for 15 minutes within 48 hours of kickoff, 3 hours
+  before that, and stops calling PropLine below 150 requests left today.
+  One game per request keeps each run inside Cloudflare's free CPU limit.
+  Books send one market in several blocks (main line plus alternate
+  ladders), so a book's main line is chosen across all its blocks; players
+  are joined by PropLine's id, and "Name (TEAM)" spellings are cleaned.
+  Once a game kicks off, its props are no longer pulled (they'd be in-play
+  prices) and the last pregame lines stay. Offline test:
+  `node worker/test_props.mjs` (19 checks).
+- **First real pull (Oct 16):** 844 props for 13 games through the Worker;
+  7 rows unmatched (a namesake pair, DeVonta Smith on PHI and CAR, is left
+  unmatched on purpose, and one book's "Kenneth" vs "Kenny" Gainwell). An
+  unmatched player still shows his lines under "Not matched to a team",
+  without history. DraftKings' anytime-TD market doesn't come through, so
+  anytime TD shows the line most books deal.
+- **Refreshing:** the scheduled refresh stores the current props
+  (`sources/props.py` -> `prop_lines`, through the Worker, so GitHub needs
+  no new secret). The **Player props** row in the refresh strip has its own
+  ↻ that pulls live props through the Worker in the browser and recomputes
+  the history against any moved line. It never touches the odds credits.
+- **History** is the player's real games this season and last (nflverse
+  weekly player stats, `sources/player_stats.py` -> `player_game_stats`)
+  against **today's** line. It is NOT a record against past lines: PropLine's
+  free plan has no historical lines (that's its $9/month Hobby tier).
+  `queries.player_game_logs` adds games he played per snap counts but
+  recorded no stat as zeros (615 such games among this season's skill
+  players on Oct 16), or the Over would look better than it is. Anytime TD
+  counts rushing, receiving and return TDs, not passing TDs.
+- **Honest samples:** every rate shows n and a 95% margin. Props use the
+  adjusted (Agresti-Coull) margin, `queries.prop_margin_of_error`, because
+  prop windows are small and often 0-for or all-for: 0 of 5 would read ±0
+  with the plain formula; adjusted it's ±27. "Signal" needs 10+ games and
+  an Over % farther from 50 than the margin. ATS records keep their formula.
+- **Matching:** PropLine games to nflverse games by both teams and a kickoff
+  within 36 hours; players by PropLine's `player_id` (ESPN's athlete id)
+  through `roster_status.espn_id` / `depth_chart_opening.espn_id`, else a
+  unique name on either team.
+- **Page math:** the page recomputes the history chips from each player's
+  exported game log (`props_payload`), the same rule as
+  `queries.prop_hit_rates`; on Oct 16 all 528 test props matched Python
+  exactly. The export is about 0.7 KB per player.
+- **Setup (done Oct 16):** free PropLine account; key stored with
+  `npx wrangler secret put PROPLINE_API_KEY` from `worker/` (typed at the
+  prompt, never committed), then `npx wrangler deploy`. Without the secret
+  the Worker answers that the key isn't set up.
+- verify.py: 13 new checks (hit-rate math, adjusted margin, signal rule,
+  stat mapping, team names, game matching, game logs and zero-fill,
+  windows, matched players on the right team).
+
+## Oct 15 additions: refresh status strip
+
+- A strip under the title shows when each part of the board was last
+  refreshed, one row per source (three columns on a wide screen), each with
+  a dot: green = fresh, yellow = older than expected or limited, red = the
+  last try failed, grey = not pulled yet. Built by `renderStatus()` in the
+  template.
+  - **Full app:** the scheduled GitHub Actions build (`D.generated`) and the
+    date results run through. Yellow after 42 hours (the longest normal gap
+    is Friday 3:30 PM to Sunday 8 AM).
+  - **Game lines:** the last live pull in this browser, the month's
+    **Odds API balance** ("420 credits remaining") and pulls used today
+    (of 12), read from the API's `x-requests-remaining` header. The
+    balance is as of the newest pull
+    anyone has made (hover for its time). When the page opens it asks the
+    Worker's free `/status` route, which reads the balance the Worker saved
+    from its last pull and never calls The Odds API, so every device shows
+    the balance without tapping ↻. A tap within 10 minutes reuses the last
+    pull for free. The ↻ button sits in this row.
+  - **Worker redeploy needed for `/status`** (once, from `worker/`):
+    `npx wrangler deploy`. Until then the Worker answers 404, the row says
+    "Credits remaining show after your first ↻ pull", and the browser
+    console logs that 404. Offline test: `node worker/test_odds.mjs`
+    (12 checks, including 3 for `/status`).
+  - **Injuries:** the live ESPN pull time and which week's official report
+    is loaded. If a pull fails it turns red and says which data is showing.
+    The + button sits in this row.
+- The old header stamps (`#stamp`, `#lines-stamp`, `#inj-stamp`) are gone;
+  the header is just the title and the This week / Teams switch.
+
+## Oct 15 additions: Roster/Injuries tab
+
+- The game page's **Roster** tab is now **Roster/Injuries** and shows both
+  teams on one page (no away/home switch), starting with a **Key injured
+  starters** summary card. See "Game page" below.
+- The "Key changes vs 2025" panel is gone from the site, and
+  `roster_changes` is no longer exported (the page is about 60 KB smaller).
+- Game-page tab labels wrap to two lines at phone width instead of running
+  into each other.
+
+## Oct 15 additions: ESPN injury news
+
+- **Injury refresh icon (+, in the Injuries row of the refresh strip):**
+  pulls ESPN's league-wide injury list
+  (`config.ESPN_INJURIES_URL`, free, no key, about 360 KB compressed)
+  straight from ESPN in the viewer's browser. It never touches the
+  Cloudflare Worker or The Odds API, so it costs no odds credits. It also
+  runs once when the page opens. Only the parts of the page that show
+  injuries re-render, and the scroll position is kept.
+- **What each injured player shows now:** ESPN's status (Questionable,
+  Doubtful, Out, Injured Reserve, Suspension...), injury (e.g. "Foot
+  (surgery, right)"), estimated return date, **when ESPN last updated him**,
+  and ESPN's latest note with a "More from ESPN" expander. These appear on
+  the game page's Roster/Injuries tab (tap a tagged player) and on the Teams page
+  cards and tables. ESPN's "est. return" is ESPN's own estimate; for
+  questionable players it's usually just the next game date.
+- **ESPN-only players:** a dashed tag (e.g. a dashed Q) means ESPN lists
+  the player but the official report gives no game status yet (on Oct 15
+  this caught Caleb Williams and Josh Jacobs). Players ESPN lists who
+  aren't on the depth chart or the official report at all go in "N more on
+  ESPN's injury list".
+- **ESPN's text is never published.** The scheduled refresh stores only
+  structured fields in `espn_injuries` (`sources/espn_injuries.py`):
+  status, injury, return date, ESPN's update time, and the player's
+  `gsis_id`. That data is baked into the page so statuses still show if
+  the live pull fails. The notes exist only in the viewer's browser tab.
+- **Matching:** ESPN ids come from each player's ESPN link and are matched
+  through `roster_status.espn_id` (new column, from nflverse weekly rosters)
+  and `depth_chart_opening.espn_id`, with a team + name fallback. ESPN's
+  LAR/WSH become LA/WAS. On Oct 15: 296 of 296 listed players matched.
+- **Unchanged on purpose:** official-report tags (OUT/D/Q/LP), the "starters
+  hurt" chip, and the Pick write-ups still use the official NFL report.
+- **Fix:** the week picker scrolls sideways instead of widening the page
+  at phone width. With five results weeks it had grown to 529 px at 400 px.
+- verify.py: 11 new checks (parsing, team codes, no stored text, match
+  rate, same-team matches, every listed player shown exactly once).
+
 ## Oct 15 additions
 
 - **Pick tab (game page):** choose a bet (each team's spread, Over, Under)
@@ -37,7 +187,7 @@
 - **L3 colors on tiles:** blue = covers / overs, orange = misses / unders
   (the colorblind-safe chart pair). Solid when one side leads by 2+ (3-0,
   2-0-1), tinted for 2-1, plain when even.
-- **Live lines (refresh icon, top right):** `worker/odds.js` is a Cloudflare
+- **Live lines (↻ icon, in the Game lines row of the refresh strip):** `worker/odds.js` is a Cloudflare
   Worker that holds The Odds API key as a secret, pulls NFL spreads and
   totals for US books (2 credits a pull), and returns them trimmed. It
   reuses a pull for 10 minutes, makes at most 12 pulls a day, and stops
@@ -45,8 +195,8 @@
   note instead. The page shows DraftKings' line (`config.ODDS_BOOK`), falling back to the line most books are dealing (ties go to
   the one nearest the median), converts the API's home-team number to the
   board's convention (`spread = -home point`, + = home favored), and
-  recomputes each model gap (`model - market`). Stats, trends and injuries
-  still update on the scheduled refresh. A viewer's last pull is reused for
+  recomputes each model gap (`model - market`). Stats and trends still update
+  on the scheduled refresh (injury news has its own + icon, see above). A viewer's last pull is reused for
   up to 12 hours if it's newer than the build. The icon only appears when
   `ODDS_RELAY_URL` is set in `config.py` (or the environment).
   Offline Worker test (no key, no credits): `node worker/test_odds.mjs`.
@@ -144,7 +294,7 @@
   download. Games whose play-by-play was loaded before this existed show
   the note without a timestamp until that season reloads (see Notes).
 - **Depth chart and injuries is frozen to Week 1, not today:** the depth
-  chart shown (Teams page and the game page's Roster tab) is the roster as
+  chart shown (Teams page and the game page's Roster/Injuries tab) is the roster as
   it stood right before Week 1 kicked off (the first ESPN depth-chart
   snapshot on/after that season's roster cutdown -- `sources.rosters.
   _opening_day_anchor`, stored in the new `depth_chart_opening` table),
@@ -154,18 +304,19 @@
   traded -- something the injury report alone won't show). The point is to
   see, at a glance, how much a team's opening lineup has actually been
   depleted over the season, rather than the board quietly "moving on" to
-  whoever's playing that slot now. (The separate "key changes vs last
-  season" panel below still compares against the *latest* depth chart on
-  purpose -- that one's about season-over-season turnover, not in-season
-  attrition, and would be wrong if it used the frozen Week 1 chart too.)
+  whoever's playing that slot now.
 - **Game page** (`#game=<id>&tab=...`, opened with "Details ›"):
   - Game logs: this season and last, playoffs included, with ATS and O/U
     results and margins (`queries.team_log`).
-  - Roster: key changes vs last season (QB, head coach, new starters, 50%+
-    snap starters who left, from `queries.roster_changes`, against the
-    latest depth chart), the "Hurt last game" note above when it applies,
-    then an ESPN-style depth chart frozen to Week 1 (Starter / 2nd / 3rd /
-    4th) with current-status injury tags; tap a tagged player for details.
+  - Roster/Injuries: both teams on one page, no team switch. First a
+    "Key injured starters" card: each team's starters who are out,
+    doubtful or questionable on the official report (reserve lists count
+    as out), plus starters only ESPN lists so far, most serious and
+    most-used first, with snap share, ESPN's estimated return and the next
+    man up. Then each team in turn (away, then home): the "Hurt last game"
+    note when it applies and an ESPN-style depth chart frozen to Week 1
+    (Starter / 2nd / 3rd / 4th) with current-status injury tags. Tap a
+    tagged player for details and ESPN's notes.
   - ATS and O/U: all games (last 3 seasons), this venue, this role
     (favorite / underdog), venue + role, head to head since 2015
     (`queries.game_splits`), plus a cover-margin / points-vs-total bar chart
@@ -431,10 +582,14 @@ returns `n` alongside the percentage.
 | `db.py` | Connection, table definitions (including `game_injury_events`, `depth_chart_opening`), and the derived SQL views. The interesting part. |
 | `sources/nflverse.py` | Downloads the nflverse games file and upserts it. Safe to re-run any time. |
 | `sources/pbp.py` | Downloads play-by-play and adds it up to one row per team per game (`team_game_stats`), including pace, neutral pass rate, explosives and fumbles. Also regexes "was injured during the play" / "has returned to the game" out of the same download into `game_injury_events` (`parse_injuries`), along with that play's quarter, game clock and full charted text. Loads 2024-2026 (2024 only for the model backtest). |
+| `sources/player_stats.py` | nflverse weekly player stats (this season and last) -> `player_game_stats`, for prop history. |
+| `sources/props.py` | Player prop lines from PropLine through the odds Worker -> `prop_lines`; matches games and players (`match_game`, `match_player`). |
+| `worker/props.js` | The Worker's PropLine relay: `/props/events`, `/props/event/{id}`; picks DraftKings' main line, else most books. |
+| `sources/espn_injuries.py` | ESPN's injury list: status, injury, estimated return, ESPN's update time, matched to `gsis_id` (`parse_feed`, `match_gsis`). Structured fields only; ESPN's notes load live in the browser. A failed pull keeps the last good list. |
 | `sources/rosters.py` | Depth charts -- both the latest daily snapshot (`depth_chart`) and the frozen Week 1 one (`depth_chart_opening`, anchored to that season's roster cutdown via `_opening_day_anchor`, both from the same download) -- injury reports, weekly roster status (IR, PUP, NFI), snap counts. |
 | `backfill.py` | Builds the database. Run again after any Sunday to pull in results. Run with `--full` once after upgrading to this feature, so `game_injury_events` backfills for already-cached seasons. |
 | `queries.py` | Every number the screens display comes from here: `team_metrics()`, `matchup_table()`, `ats_angles()`, `recent_games()` (last-N, or `since_season=` for the full ATS chart), `game_box_score()` (a played game's real stats, for the results view), `availability()` (depth chart frozen to `depth_chart_opening`, current status overlaid, `"gone"` status for anyone who's left the roster) / `hurt_last_game()`, `roster_changes()` (year-over-year turnover, deliberately still against `depth_chart`'s latest snapshot), `model_lines()`, `model_backtest()`, `luck_table()`. |
-| `verify.py` | 91 checks: ATS logic, team metrics, cover margins, injury overlay, in-game injury parsing, week-visibility rules, results-view stats, model (out-of-sample, sane constants), luck, pace. Re-run after any change. |
+| `verify.py` | 114 checks (ESPN injury list and player props included): ATS logic, team metrics, cover margins, injury overlay, in-game injury parsing, week-visibility rules, results-view stats, model (out-of-sample, sane constants), luck, pace. Re-run after any change. |
 | `app.py` | **Screen 1.** The board itself. `streamlit run app.py` |
 | `Run NFL Board.bat` | Double-click launcher for Windows. |
 | `export_board.py` | Builds the website snapshot: `board_data.json` + `web\NFL Board.html`. `determine_weeks()` / `show_next_week()` decide which weeks are upcoming vs. results. |
@@ -522,8 +677,9 @@ Two things exist ahead of when they're needed:
   is simply skipped until it does.
 - The depth chart shown on the board is deliberately the frozen Week 1 one
   (`depth_chart_opening`), not the live daily one (`depth_chart`) -- see "The
-  website" section above. `queries.roster_changes()` (the separate "key
-  changes vs last season" panel) still reads the live one on purpose.
+  website" section above. `queries.roster_changes()` (year-over-year
+  turnover) still reads the live one, but is no longer shown on the site
+  (removed Oct 15); verify.py still checks it.
 
 ---
 

@@ -971,6 +971,38 @@ def injury_origins(team: str, season: int, week: int, conn) -> dict:
             "players": players}
 
 
+ESPN_FIELDS = ("status", "injury", "return_date", "updated_at")
+
+
+def espn_listings(team: str, season: int, conn) -> dict:
+    """
+    ESPN's injury list for TEAM as of the last refresh (table espn_injuries):
+    {"by_espn": {espn_id: row}, "by_gsis": {gsis_id: row}, "ids": {gsis_id: espn_id},
+     "fetched_at"}. Each row has status, injury, return_date (ESPN's estimate),
+    updated_at (ESPN's last update on the player) and gsis_id. "ids" links
+    every rostered player to his ESPN id so the board can match the live pull.
+    Empty dicts when the table doesn't exist yet or the pull has never worked.
+    """
+    out = {"by_espn": {}, "by_gsis": {}, "ids": {}, "fetched_at": None}
+    try:
+        rows = conn.execute(f"""SELECT espn_id, gsis_id, player_name, position,
+                                       {', '.join(ESPN_FIELDS)}
+                                FROM espn_injuries WHERE team = ?""", (team,)).fetchall()
+        out["fetched_at"] = conn.execute("SELECT MAX(fetched_at) FROM espn_injuries").fetchone()[0]
+        ids = conn.execute("""SELECT gsis_id, espn_id FROM roster_status
+                              WHERE season = ? AND team = ? AND espn_id IS NOT NULL ORDER BY week""",
+                           (season, team)).fetchall()
+    except sqlite3.OperationalError:       # database older than this code
+        return out
+    for r in rows:
+        d = dict(r)
+        out["by_espn"][d["espn_id"]] = d
+        if d["gsis_id"]:
+            out["by_gsis"][d["gsis_id"]] = d
+    out["ids"] = {r["gsis_id"]: r["espn_id"] for r in ids}   # latest week wins
+    return out
+
+
 def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = None,
                  conn=None) -> dict:
     """
@@ -997,7 +1029,7 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
     # current injury/roster status overlaid below -- not whatever the depth
     # chart has already been reshuffled to today.
     depth = pd.read_sql_query("""
-        SELECT side, formation, pos_abb, pos_slot, pos_rank, player_name, gsis_id, snapshot_at
+        SELECT side, formation, pos_abb, pos_slot, pos_rank, player_name, gsis_id, espn_id, snapshot_at
         FROM depth_chart_opening WHERE team = ?
     """, conn, params=[team])
 
@@ -1029,8 +1061,19 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
                            (f"injuries_{season}",)).fetchone()
     except sqlite3.OperationalError:       # tables not created yet (database older than this code)
         seen, src = {}, None
+    espn = espn_listings(team, season, conn)
     if close:
         conn.close()
+
+    def espn_of(gid, eid):
+        """ESPN's listing for a player (by ESPN id, else gsis id), or None."""
+        r = espn["by_espn"].get(eid) if eid else None
+        if r is None and gid:
+            r = espn["by_gsis"].get(gid)
+        return r
+
+    def espn_id_of(gid, eid=None):
+        return eid or espn["ids"].get(gid)
 
     def when(gid):
         """Origin + first-seen fields for a listed player (empty for everyone else)."""
@@ -1060,6 +1103,8 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
     rows = []
     for _, d in depth.iterrows():
         gid = d["gsis_id"] if isinstance(d["gsis_id"], str) else None
+        eid = _s(d["espn_id"])                      # the depth loader writes a missing id as "<NA>"
+        eid = espn_id_of(gid, None if eid in (None, "<NA>", "nan") else eid)
         ir = inj.loc[gid] if gid in inj.index else None
         ro = roster.loc[gid] if gid in roster.index else None
         ros_status = ro["status"] if ro is not None else None
@@ -1093,6 +1138,7 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
             "practice_status": ir["practice_status"] if ir is not None and isinstance(ir["practice_status"], str) else None,
             "snap_share": share, "snap_basis": basis,
             **(when(gid) if gid and status != "gone" else when(None)),
+            "espn_id": eid, "espn": espn_of(gid, eid) if status != "gone" else None,
         })
     dc = pd.DataFrame(rows)
 
@@ -1125,6 +1171,7 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
         "list": RESERVE_LABELS.get(r["status_code"] if isinstance(r["status_code"], str) else "", "Reserve list"),
         "snap_share": share_of(gid)[0], "snap_basis": share_of(gid)[1],
         **when(gid),
+        "espn_id": espn_id_of(gid), "espn": espn_of(gid, espn_id_of(gid)),
     } for gid, r in res.iterrows()])
     if not reserve.empty:
         reserve = reserve.sort_values("snap_share", ascending=False, na_position="last").reset_index(drop=True)
@@ -1137,10 +1184,24 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
         "injury": injury_text(gid), "practice_status": r["practice_status"] if isinstance(r["practice_status"], str) else None,
         "snap_share": share_of(gid)[0], "snap_basis": share_of(gid)[1],
         **when(gid),
+        "espn_id": espn_id_of(gid), "espn": espn_of(gid, espn_id_of(gid)),
     } for gid, r in other.iterrows()])
     if not other_injuries.empty:
         other_injuries = other_injuries[other_injuries["status"] != "active"]
         other_injuries = other_injuries.sort_values("snap_share", ascending=False, na_position="last").reset_index(drop=True)
+
+    # Players ESPN lists as hurt who aren't on the board anywhere above: not on
+    # the opening depth chart, not on a reserve list, not on the official report.
+    shown = {x for df in (dc, reserve, other_injuries) if not df.empty for x in df["espn_id"].dropna()}
+    shown_gsis = on_chart | set(res.index) | set(other.index)
+    espn_only = pd.DataFrame([{
+        "player_name": r["player_name"], "position": r["position"], "espn_id": eid,
+        "snap_share": share_of(r["gsis_id"])[0], "snap_basis": share_of(r["gsis_id"])[1],
+        "espn": r,
+    } for eid, r in espn["by_espn"].items()
+        if r["status"] != "Active" and eid not in shown and r["gsis_id"] not in shown_gsis])
+    if not espn_only.empty:
+        espn_only = espn_only.sort_values("snap_share", ascending=False, na_position="last").reset_index(drop=True)
 
     hurt_last = hurt_last_game(team, season, week - 1, conn=None) if close else \
         hurt_last_game(team, season, week - 1, conn=conn)
@@ -1151,6 +1212,7 @@ def availability(team: str, season: int = CURRENT_SEASON, week: Optional[int] = 
         "report_is_current": rep_week == week,
         "snapshot_at": depth["snapshot_at"].max() if len(depth) else None,
         "depth": dc, "reserve": reserve, "other_injuries": other_injuries,
+        "espn_only": espn_only, "espn_fetched": espn["fetched_at"],
         "hurt_last_game": hurt_last,
         "last_game": origins["last_game"],
         "injury_data_updated": src["updated_at"] if src else None,
@@ -1753,3 +1815,191 @@ def game_weather(game: dict, conn=None) -> dict:
         flags.append(f"rain {RAIN_FLAG_PCT}%+")
     out["flag"] = " · ".join(flags) or None
     return out
+
+
+# ---------------------------------------------------------------------------
+# Player props: the current line (prop_lines, from PropLine via the Worker)
+# against what the player actually did in past games (player_game_stats).
+#
+# This is NOT a record against past lines -- PropLine's free plan has no
+# historical lines. It answers "how often would TODAY'S line have cashed in
+# his recent games?". A game he played without recording the stat (snap
+# counts say he was on the field) counts as a zero, or the Over would look
+# better than it is.
+# ---------------------------------------------------------------------------
+# market -> (label, stat columns summed)
+PROP_MARKETS = {
+    "player_pass_yds":           ("Passing yards", ("passing_yards",)),
+    "player_pass_tds":           ("Passing TDs", ("passing_tds",)),
+    "player_pass_completions":   ("Completions", ("completions",)),
+    "player_pass_attempts":      ("Pass attempts", ("attempts",)),
+    "player_pass_interceptions": ("Interceptions thrown", ("passing_interceptions",)),
+    "player_rush_yds":           ("Rushing yards", ("rushing_yards",)),
+    "player_rush_attempts":      ("Rush attempts", ("carries",)),
+    "player_receptions":         ("Receptions", ("receptions",)),
+    "player_reception_yds":      ("Receiving yards", ("receiving_yards",)),
+    "player_rush_reception_yds": ("Rush + rec yards", ("rushing_yards", "receiving_yards")),
+    "player_pass_rush_yds":      ("Pass + rush yards", ("passing_yards", "rushing_yards")),
+    # Rushing, receiving and return TDs; a passing TD doesn't count, same as the books.
+    "player_anytime_td":         ("Anytime TD", ("rushing_tds", "receiving_tds", "special_teams_tds")),
+}
+PROP_STAT_COLS = ["completions", "attempts", "passing_yards", "passing_tds", "passing_interceptions",
+                  "carries", "rushing_yards", "rushing_tds", "receptions", "targets",
+                  "receiving_yards", "receiving_tds", "special_teams_tds"]
+
+
+def player_game_logs(gsis_ids, conn, through: Optional[str] = None) -> pd.DataFrame:
+    """
+    One row per game each player played, this season and last, newest first:
+    gsis_id, season, week, gameday, team, opponent, zero_filled + every
+    PROP_STAT_COLS count. A game is "played" if nflverse has a stat line OR
+    snap counts show offensive snaps (those games get zeros, zero_filled=1).
+    `through` (YYYY-MM-DD): only games before that date.
+    """
+    ids = sorted({g for g in gsis_ids if isinstance(g, str)})
+    cols = ["gsis_id", "season", "week", "gameday", "team", "opponent", "zero_filled"] + PROP_STAT_COLS
+    if not ids:
+        return pd.DataFrame(columns=cols)
+    first = CURRENT_SEASON - 1
+    q = ",".join("?" * len(ids))
+    stats = pd.read_sql_query(f"""
+        SELECT gsis_id, season, week, team, opponent, {", ".join(PROP_STAT_COLS)}
+        FROM player_game_stats WHERE gsis_id IN ({q}) AND season >= ?
+    """, conn, params=[*ids, first])
+    # Snap rows -> gsis through the weekly roster's pfr id (any week, either season).
+    snaps = pd.read_sql_query(f"""
+        SELECT DISTINCT r.gsis_id, s.season, s.week, s.team
+        FROM snap_counts s
+        JOIN (SELECT DISTINCT gsis_id, pfr_id FROM roster_status WHERE pfr_id IS NOT NULL) r
+          ON r.pfr_id = s.pfr_player_id
+        WHERE r.gsis_id IN ({q}) AND s.season >= ? AND COALESCE(s.offense_snaps, 0) > 0
+    """, conn, params=[*ids, first])
+    games = pd.read_sql_query("""
+        SELECT season, week, gameday, home_team, away_team FROM games
+        WHERE season >= ? AND result IS NOT NULL
+    """, conn, params=[first])
+    side = pd.concat([
+        games.rename(columns={"home_team": "team", "away_team": "opp"}),
+        games.rename(columns={"away_team": "team", "home_team": "opp"}),
+    ])[["season", "week", "team", "gameday", "opp"]]
+
+    missing = snaps.merge(stats[["gsis_id", "season", "week"]], how="left", indicator=True,
+                          on=["gsis_id", "season", "week"])
+    missing = missing[missing["_merge"] == "left_only"].drop(columns="_merge")
+    for c in PROP_STAT_COLS:
+        missing[c] = 0
+    missing["opponent"] = None
+    stats["zero_filled"] = 0
+    missing["zero_filled"] = 1
+    log = pd.concat([stats, missing], ignore_index=True)
+    log = log.merge(side, how="left", on=["season", "week", "team"])
+    log["opponent"] = [o if isinstance(o, str) else (p if isinstance(p, str) else None)
+                       for o, p in zip(log["opponent"], log["opp"])]
+    log = log[log["gameday"].notna()]           # only games that have been played
+    if through:
+        log = log[log["gameday"] < through]
+    log["zero_filled"] = log["zero_filled"].astype(int)
+    return log[cols].sort_values(["gsis_id", "gameday"], ascending=[True, False]).reset_index(drop=True)
+
+
+def prop_value(row, market: str) -> float:
+    """The stat a prop market settles on, for one game row."""
+    return float(sum(row[c] for c in PROP_MARKETS[market][1]))
+
+
+def prop_margin_of_error(over: int, under: int) -> Optional[float]:
+    """
+    95% margin of error for a prop hit rate, in points (Agresti-Coull: add two
+    overs and two unders before the usual formula). Prop windows are small
+    and often 0-for or all-for -- 0 of 5 would read "+/-0" with the plain
+    formula, which is exactly backwards. This keeps it honest (+/-27 there).
+    """
+    n = over + under
+    if n == 0:
+        return None
+    p = (over + 2) / (n + 4)
+    return 1.96 * math.sqrt(p * (1 - p) / (n + 4)) * 100
+
+
+def prop_hit_rates(values: list, line: float) -> dict:
+    """Over / under / push counts of `values` (newest first) against `line`:
+    o, u, p, n (pushes excluded), pct (Over %), moe, and sig -- a signal only
+    with n >= MIN_SIGNAL_N and the Over % farther from 50% than the moe."""
+    over = int(sum(v > line for v in values))
+    under = int(sum(v < line for v in values))
+    n = over + under
+    pct = over / n * 100 if n else None
+    moe = prop_margin_of_error(over, under)
+    sig = bool(pct is not None and n >= MIN_SIGNAL_N and abs(pct - 50) > moe)
+    return {"o": over, "u": under, "p": len(values) - n, "n": n,
+            "pct": None if pct is None else round(pct, 1), "moe": None if moe is None else round(moe, 1), "sig": sig}
+
+
+def prop_windows(log: pd.DataFrame, market: str, line: float, opponent: Optional[str]) -> dict:
+    """Hit rates for one player's log (newest first) in each history window."""
+    vals = [prop_value(r, market) for _, r in log.iterrows()]
+    seasons = list(log["season"])
+    opps = list(log["opponent"])
+    win = {
+        "l5": vals[:5], "l10": vals[:10],
+        "now": [v for v, s in zip(vals, seasons) if s == CURRENT_SEASON],
+        "prior": [v for v, s in zip(vals, seasons) if s == CURRENT_SEASON - 1],
+        "opp": [v for v, o in zip(vals, opps) if opponent and o == opponent],
+    }
+    out = {k: prop_hit_rates(v, line) for k, v in win.items()}
+    out["avg"] = round(sum(vals[:10]) / len(vals[:10]), 1) if vals else None
+    s10 = sorted(vals[:10])
+    out["med"] = (s10[(len(s10) - 1) // 2] + s10[len(s10) // 2]) / 2 if s10 else None
+    return out
+
+
+def game_props(game_id: str, conn=None) -> dict:
+    """
+    {"fetched_at", "players": [...], "logs": {gsis_id: DataFrame}} for one
+    upcoming game. Each player: player_name, gsis_id, espn_id, team,
+    opponent, position, and props (market, label, line, prices, book,
+    windows). Empty players when PropLine has nothing for the game yet.
+    """
+    close = conn is None
+    conn = conn or connect(read_only=True)
+    try:
+        lines = pd.read_sql_query("SELECT * FROM prop_lines WHERE game_id = ?", conn, params=[game_id])
+    except Exception:              # database older than this code
+        lines = pd.DataFrame()
+    g = conn.execute("SELECT gameday, home_team, away_team FROM games WHERE game_id = ?", (game_id,)).fetchone()
+    if lines.empty or g is None:
+        if close:
+            conn.close()
+        return {"fetched_at": None, "players": [], "logs": {}}
+    logs = player_game_logs(lines["gsis_id"], conn, through=g["gameday"])
+    pos = {r["gsis_id"]: r["position"] for r in conn.execute(
+        f"SELECT DISTINCT gsis_id, position FROM roster_status WHERE season = ? AND gsis_id IN ({','.join('?' * lines['gsis_id'].nunique())})",
+        (CURRENT_SEASON, *lines["gsis_id"].dropna().unique()))} if lines["gsis_id"].notna().any() else {}
+    if close:
+        conn.close()
+    by_player = {gid: df for gid, df in logs.groupby("gsis_id")} if not logs.empty else {}
+    order = list(PROP_MARKETS)
+    players = []
+    for name, rows in lines.groupby("player_name", sort=False):
+        # Any row that matched speaks for the player (one market can arrive without an id).
+        gid = next((g for g in map(_s, rows["gsis_id"]) if g), None)
+        team = next((t for t in map(_s, rows["team"]) if t), None)
+        opp = None if team is None else (g["away_team"] if team == g["home_team"] else g["home_team"])
+        log = by_player.get(gid, pd.DataFrame(columns=logs.columns))
+        props = []
+        for _, r in rows.iterrows():
+            if r["market"] not in PROP_MARKETS:
+                continue
+            props.append({
+                "market": r["market"], "label": PROP_MARKETS[r["market"]][0], "line": float(r["line"]),
+                "over": None if pd.isna(r["over_price"]) else int(r["over_price"]),
+                "under": None if pd.isna(r["under_price"]) else int(r["under_price"]),
+                "book": _s(r["book"]), "n_books": None if pd.isna(r["n_books"]) else int(r["n_books"]),
+                "windows": prop_windows(log, r["market"], float(r["line"]), opp) if gid else None,
+            })
+        props.sort(key=lambda p: order.index(p["market"]))
+        pid = next((p for p in map(_s, rows["player_id"]) if p), None)
+        players.append({"player_name": name, "gsis_id": gid, "team": team, "opponent": opp,
+                        "espn_id": pid[5:] if pid and pid.startswith("espn:") else None,
+                        "position": pos.get(gid), "props": props})
+    return {"fetched_at": lines["fetched_at"].max(), "players": players, "logs": by_player}

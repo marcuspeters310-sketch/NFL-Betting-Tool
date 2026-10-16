@@ -21,7 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 import queries
-from config import CURRENT_SEASON, PROJECT_ROOT, WIND_FLAG_MPH, RAIN_FLAG_PCT, CHART_SINCE_SEASON, ODDS_RELAY_URL, ODDS_BOOK
+from config import CURRENT_SEASON, PROJECT_ROOT, WIND_FLAG_MPH, RAIN_FLAG_PCT, CHART_SINCE_SEASON, ODDS_RELAY_URL, ODDS_BOOK, ESPN_INJURIES_URL, PROPS_RELAY_URL
 
 THROUGH = CURRENT_SEASON - 1   # ATS splits use completed seasons only
 N_SEASONS = 3
@@ -127,6 +127,44 @@ def origin_payload(r: dict) -> dict:
     return out
 
 
+def espn_payload(e) -> dict | None:
+    """ESPN's structured listing (queries.espn_listings): status, injury,
+    estimated return, ESPN's last update. ESPN's text is never exported."""
+    if not isinstance(e, dict):
+        return None
+    return {"s": text(e.get("status")), "i": text(e.get("injury")),
+            "ret": text(e.get("return_date")), "up": text(e.get("updated_at"))}
+
+
+def espn_listed(e) -> bool:
+    return isinstance(e, dict) and e.get("status") not in (None, "Active")
+
+
+def props_payload(gp: dict) -> dict | None:
+    """One game's player props (queries.game_props). Each player carries his
+    game log (newest first, this season and last) as rows of
+    [date, opponent, season, zero_filled, value per prop in his `ps` order],
+    so the page can recompute the hit rates when a live pull moves a line."""
+    if not gp["players"]:
+        return None
+    players = []
+    for p in gp["players"]:
+        log = gp["logs"].get(p["gsis_id"])
+        rows = [] if log is None else [
+            [r["gameday"], text(r["opponent"]), int(r["season"]), int(r["zero_filled"]),
+             *[int(queries.prop_value(r, x["market"])) for x in p["props"]]]
+            for _, r in log.iterrows()]
+        players.append({
+            "n": p["player_name"], "t": p["team"], "op": p["opponent"], "pos": p["position"], "e": p["espn_id"],
+            # Hit rates (queries.prop_windows) are recomputed on the page from `log`
+            # -- the same rule, and it must, because a live pull can move the line.
+            "ps": [{"m": x["market"], "l": x["label"], "pt": x["line"], "o": x["over"], "u": x["under"],
+                    "bk": x["book"], "nb": x["n_books"]} for x in p["props"]],
+            "log": rows,
+        })
+    return {"at": text(gp["fetched_at"]), "players": players}
+
+
 def availability_payload(av: dict) -> dict:
     def share(x):
         return None if x is None or pd.isna(x) else round(float(x), 3)
@@ -137,15 +175,22 @@ def availability_payload(av: dict) -> dict:
         row = {"s": r["side"], "p": r["pos_abb"], "r": int(r["pos_rank"]),
                "sl": num(r.get("pos_slot")), "f": text(r.get("formation")),
                "st": bool(r["starter"]), "n": text(r["player_name"]) or "(unnamed)", "x": r["status"]}
-        if r["status"] != "active":
+        # Every player carries his ESPN id so the page can match a live ESPN pull.
+        if text(r.get("espn_id")):
+            row["e"] = text(r["espn_id"])
+        # Details for anyone the official report OR ESPN lists as not fully available.
+        if r["status"] != "active" or espn_listed(r.get("espn")):
             row.update({"rs": text(r["report_status"]), "inj": text(r["injury"]),
                         "pr": text(r["practice_status"]), "sh": share(r["snap_share"]),
                         "sb": text(r["snap_basis"]), "rp": text(r["replacement"]),
                         "rsh": share(r["replacement_share"]), **origin_payload(r)})
+            if isinstance(r.get("espn"), dict):
+                row["es"] = espn_payload(r["espn"])
         depth.append(row)
     def plain(df, cols):
         return [] if df.empty else [
-            {**{c: (share(r[c]) if c == "snap_share" else text(r[c])) for c in cols}, **origin_payload(r)}
+            {**{c: (share(r[c]) if c == "snap_share" else text(r[c])) for c in cols}, **origin_payload(r),
+             "e": text(r.get("espn_id")), "es": espn_payload(r.get("espn"))}
             for r in df.to_dict("records")]
     hurt_last = av.get("hurt_last_game")
     hurt_last_game = [] if hurt_last is None or hurt_last.empty else [
@@ -164,6 +209,11 @@ def availability_payload(av: dict) -> dict:
         "reserve": plain(av["reserve"], ["player_name", "position", "list", "snap_share", "snap_basis"]),
         "other": plain(av["other_injuries"], ["player_name", "position", "status", "report_status",
                                               "injury", "practice_status", "snap_share", "snap_basis"]),
+        "espn_only": [] if av["espn_only"].empty else [
+            {"player_name": text(r["player_name"]), "position": text(r["position"]), "e": text(r["espn_id"]),
+             "snap_share": share(r["snap_share"]), "snap_basis": text(r["snap_basis"]), "es": espn_payload(r["espn"])}
+            for r in av["espn_only"].to_dict("records")],
+        "espn_at": text(av.get("espn_fetched")),
         "hurt_last_game": hurt_last_game,
         "hurt_last_game_date": hurt_last_game_date,
         "last_game": av.get("last_game"),
@@ -261,6 +311,7 @@ def main() -> None:
                     "market_total", "total_edge", "home_rating", "away_rating")}
                 gp["model"].update({"side": text(mr["model_side"]), "lean": text(mr["total_lean"])})
             gp["wx"] = weather_payload(queries.game_weather(g.to_dict(), conn=conn))
+            gp["props"] = props_payload(queries.game_props(g["game_id"], conn=conn))
             spread = num(g["spread_line"])
             gp["splits"] = {
                 side: splits_payload(queries.game_splits(
@@ -300,10 +351,9 @@ def main() -> None:
         })
 
     # Game-page extras for every team on an exported slate: game logs for this
-    # season and last, and what changed on the roster since last season.
+    # season and last. (queries.roster_changes is no longer shown on the page.)
     slate_teams = sorted({t for wk in weeks for g in wk["games"] for t in (g["away"], g["home"])})
-    teamx = {t: {"log": log_payload(queries.team_log(t, conn=conn)),
-                 "changes": queries.roster_changes(t, conn=conn)} for t in slate_teams}
+    teamx = {t: {"log": log_payload(queries.team_log(t, conn=conn))} for t in slate_teams}
 
     luck_now = queries.luck_table(CURRENT_SEASON, None, conn=conn)
     luck_prior = queries.luck_table(CURRENT_SEASON - 1, None, conn=conn)
@@ -357,6 +407,8 @@ def main() -> None:
         "weather_flags": {"wind": WIND_FLAG_MPH, "rain": RAIN_FLAG_PCT},
         "odds_url": ODDS_RELAY_URL or None,
         "odds_book": ODDS_BOOK,
+        "espn_injuries_url": ESPN_INJURIES_URL,
+        "props_url": PROPS_RELAY_URL or None,
     }
 
     # NaN is not valid JSON and would stop the web page from loading, so clean

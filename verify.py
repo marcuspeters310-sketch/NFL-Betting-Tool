@@ -655,6 +655,137 @@ check("pass and rush EPA keep rank 1 = best: highest on offense, lowest allowed 
       all(m_all.loc[m_all[f"{k}_rank"] == 1, k].iloc[0] == (m_all[k].max() if k.startswith("off") else m_all[k].min())
           for k in ("off_pass_epa", "off_rush_epa", "def_pass_epa", "def_rush_epa")))
 
+# ---------------------------------------------------------------------------
+# ESPN injury list (sources/espn_injuries.py): parsing, team codes, player
+# matching, and that ESPN's written notes are never stored.
+# ---------------------------------------------------------------------------
+from sources.espn_injuries import parse_feed, COLS as ESPN_COLS
+
+def _espn_item(eid, team, status, details=None, date="2026-10-15T20:40Z"):
+    return {"status": status, "date": date, "shortComment": "short note", "longComment": "long note",
+            "details": details or {},
+            "athlete": {"displayName": f"Player {eid}", "position": {"abbreviation": "WR"},
+                        "team": {"abbreviation": team},
+                        "links": [{"href": f"https://www.espn.com/nfl/player/_/id/{eid}/player"}]}}
+feed = parse_feed({"injuries": [{"injuries": [
+    _espn_item("101", "LAR", "Injured Reserve", {"type": "Foot", "detail": "Surgery", "side": "Right", "returnDate": "2026-10-25"}),
+    _espn_item("102", "WSH", "Questionable", {"type": "Ankle", "detail": "Not Specified", "side": "Not Specified"}),
+    _espn_item("103", "ARI", "Active"),
+]}]})
+by = {r["espn_id"]: r for r in feed}
+check("ESPN parse: LAR -> LA, WSH -> WAS, other codes unchanged",
+      [by[k]["team"] for k in ("101", "102", "103")] == ["LA", "WAS", "ARI"], str([r["team"] for r in feed]))
+check("ESPN parse: injury text drops 'Not Specified' (Foot (surgery, right) / Ankle / none)",
+      [by[k]["injury"] for k in ("101", "102", "103")] == ["Foot (surgery, right)", "Ankle", None],
+      str([r["injury"] for r in feed]))
+check("ESPN parse: return date is YYYY-MM-DD or empty, update time is ESPN's own",
+      by["101"]["return_date"] == "2026-10-25" and by["102"]["return_date"] is None
+      and by["101"]["updated_at"] == "2026-10-15T20:40Z")
+check("ESPN parse keeps no written notes (they're shown live only, never stored or published)",
+      not any("note" in str(v) for r in feed for v in r.values()), str(feed[0]))
+try:
+    espn_cols = [r[1] for r in conn.execute("PRAGMA table_info(espn_injuries)")]
+    n_espn = conn.execute("SELECT COUNT(*) FROM espn_injuries").fetchone()[0]
+except Exception:
+    espn_cols, n_espn = [], 0
+check("espn_injuries has only structured columns (no ESPN text)",
+      sorted(espn_cols) == sorted(ESPN_COLS), str(espn_cols))
+if n_espn:
+    nfl_teams = {r["team"] for r in conn.execute("SELECT DISTINCT team FROM team_game_stats WHERE season = ?",
+                                                (CURRENT_SEASON,))}
+    bad = {r["team"] for r in conn.execute("SELECT DISTINCT team FROM espn_injuries")} - nfl_teams
+    check("every ESPN team code is an nflverse team", not bad, str(sorted(bad)))
+    r = conn.execute("""
+        SELECT COUNT(*) AS n, SUM(gsis_id IS NOT NULL) AS matched FROM espn_injuries WHERE status != 'Active'
+    """).fetchone()
+    check("95%+ of ESPN-listed players are matched to a player id",
+          r["n"] == 0 or r["matched"] >= 0.95 * r["n"], f"{r['matched']} of {r['n']}")
+    r = conn.execute("""
+        SELECT COUNT(*) AS n, SUM(rs.team = e.team) AS same FROM espn_injuries e
+        JOIN roster_status rs ON rs.gsis_id = e.gsis_id AND rs.season = ?
+         AND rs.week = (SELECT MAX(week) FROM roster_status WHERE season = ?)
+        WHERE e.status != 'Active'
+    """, (CURRENT_SEASON, CURRENT_SEASON)).fetchone()
+    check("matched ESPN players are on that same team's latest roster (95%+; trades can lag a day)",
+          r["n"] == 0 or r["same"] >= 0.95 * r["n"], f"{r['same']} of {r['n']}")
+    r = conn.execute("""SELECT COUNT(*) AS n FROM espn_injuries
+                        WHERE return_date IS NOT NULL AND return_date NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'""").fetchone()
+    check("ESPN return dates are all YYYY-MM-DD", r["n"] == 0, f"{r['n']} bad")
+    team = conn.execute("""SELECT team FROM espn_injuries WHERE status != 'Active'
+                           GROUP BY team ORDER BY COUNT(*) DESC LIMIT 1""").fetchone()["team"]
+    av = queries.availability(team, CURRENT_SEASON, conn=conn)
+    listed = {r["espn_id"] for r in conn.execute(
+        "SELECT espn_id FROM espn_injuries WHERE team = ? AND status != 'Active'", (team,))}
+    on_board = set(av["depth"]["espn_id"].dropna()) | {
+        x for df in (av["reserve"], av["other_injuries"]) if not df.empty for x in df["espn_id"].dropna()}
+    eo = set(av["espn_only"]["espn_id"]) if not av["espn_only"].empty else set()
+    shown = {x for x in listed if x in on_board} | eo
+    check(f"{team}: every ESPN-listed player shows once, on the board or in the ESPN-only list",
+          listed <= shown and not (eo & on_board), f"{len(listed)} listed, {len(listed - shown)} missing, {len(eo & on_board)} doubled")
+    depth_with = av["depth"][av["depth"]["espn"].apply(lambda x: isinstance(x, dict))]
+    check(f"{team}: a depth-chart player's ESPN listing is his own (same ESPN id)",
+          all(r["espn"]["espn_id"] == r["espn_id"] or r["espn"]["gsis_id"] == r["gsis_id"]
+              for _, r in depth_with.iterrows()), f"{len(depth_with)} rows")
+
+# ---------------------------------------------------------------------------
+# Player props: hit-rate math, stat mapping, game logs (zero-filled from snap
+# counts), and PropLine game/team matching.
+# ---------------------------------------------------------------------------
+from sources.props import NICK, team_abbr, match_game
+
+hr = queries.prop_hit_rates([10, 5, 5, 0], 5)
+check("prop hit rates: over/under count, pushes kept out of n",
+      (hr["o"], hr["u"], hr["p"], hr["n"]) == (1, 1, 2, 2), str(hr))
+check("prop margin of error doesn't collapse to ±0 at 0-for-5 (adjusted: about ±27)",
+      26 < queries.prop_margin_of_error(0, 5) < 28, f"{queries.prop_margin_of_error(0, 5):.1f}")
+check("a prop 'signal' needs 10+ games: 5-0 isn't one, 10-0 is",
+      not queries.prop_hit_rates([9] * 5, 5)["sig"] and queries.prop_hit_rates([9] * 10, 5)["sig"])
+row = {c: 0 for c in queries.PROP_STAT_COLS} | {"rushing_yards": 40, "receiving_yards": 25, "passing_tds": 3,
+                                                "rushing_tds": 0, "receiving_tds": 0, "special_teams_tds": 1}
+check("prop stats: rush+rec yards add up; anytime TD counts a return TD but not a passing TD",
+      queries.prop_value(row, "player_rush_reception_yds") == 65 and queries.prop_value(row, "player_anytime_td") == 1)
+check("PropLine team names map to all 32 nflverse teams",
+      len(set(NICK.values())) == 32 and team_abbr("Washington Commanders") == "WAS" and team_abbr("Los Angeles Rams") == "LA"
+      and team_abbr("Los Angeles Chargers") == "LAC" and team_abbr("New York Jets") == "NYJ")
+fake_games = [{"game_id": "G1", "gameday": "2026-10-18", "gametime": "13:00", "home_team": "DEN", "away_team": "SEA"}]
+check("a PropLine game matches by both teams and a kickoff within 36 hours, not by teams alone",
+      match_game({"home": "Denver Broncos", "away": "Seattle Seahawks", "commence": "2026-10-18T17:00:00Z"}, fake_games) == "G1"
+      and match_game({"home": "Denver Broncos", "away": "Seattle Seahawks", "commence": "2026-12-20T17:00:00Z"}, fake_games) is None)
+
+try:
+    n_pgs = conn.execute("SELECT COUNT(*) FROM player_game_stats WHERE season = ?", (CURRENT_SEASON,)).fetchone()[0]
+except Exception:
+    n_pgs = 0
+check("player game stats loaded for this season", n_pgs > 0, f"{n_pgs} player-games")
+if n_pgs:
+    sample = [r[0] for r in conn.execute("""SELECT gsis_id FROM player_game_stats WHERE season = ? AND position IN ('WR', 'RB', 'TE', 'QB')
+                                            GROUP BY gsis_id ORDER BY SUM(receiving_yards + rushing_yards + passing_yards) DESC LIMIT 60""",
+                                         (CURRENT_SEASON,))]
+    logs = queries.player_game_logs(sample, conn)
+    check("game logs: one row per player-game, this season and last only, newest first",
+          not logs.duplicated(["gsis_id", "season", "week"]).any() and logs["season"].min() >= CURRENT_SEASON - 1
+          and all((g["gameday"].tolist() == sorted(g["gameday"], reverse=True)) for _, g in logs.groupby("gsis_id")),
+          f"{len(logs)} rows")
+    zf = logs[logs["zero_filled"] == 1]
+    check("zero-filled games (played per snap counts, no stat line) are all zeros and only games that were played",
+          (zf[queries.PROP_STAT_COLS].sum(axis=1) == 0).all() and logs["gameday"].notna().all(), f"{len(zf)} zero-filled")
+    one = logs[logs["zero_filled"] == 0].iloc[0]
+    raw = conn.execute("SELECT receiving_yards, rushing_yards, passing_yards FROM player_game_stats WHERE gsis_id = ? AND season = ? AND week = ?",
+                       (one["gsis_id"], int(one["season"]), int(one["week"]))).fetchone()
+    check("a game-log row carries the player's nflverse stat line unchanged",
+          (raw["receiving_yards"], raw["rushing_yards"], raw["passing_yards"]) == (one["receiving_yards"], one["rushing_yards"], one["passing_yards"]))
+    w = queries.prop_windows(logs[logs["gsis_id"] == sample[0]], "player_rush_reception_yds", 50.5, None)
+    check("prop windows: L5 <= 5 and L10 <= 10 games; this-season + last-season = all games",
+          w["l5"]["n"] + w["l5"]["p"] <= 5 and w["l10"]["n"] + w["l10"]["p"] <= 10
+          and w["now"]["n"] + w["now"]["p"] + w["prior"]["n"] + w["prior"]["p"] == len(logs[logs["gsis_id"] == sample[0]]))
+try:
+    bad = conn.execute("""SELECT COUNT(*) FROM prop_lines p JOIN games g ON g.game_id = p.game_id
+                          WHERE p.team IS NOT NULL AND p.team NOT IN (g.home_team, g.away_team)""").fetchone()[0]
+    n_props = conn.execute("SELECT COUNT(*) FROM prop_lines").fetchone()[0]
+except Exception:
+    bad, n_props = 0, 0
+check("every matched prop player is on one of that game's two teams", bad == 0, f"{bad} of {n_props}")
+
 conn.close()
 
 # ---------------------------------------------------------------------------

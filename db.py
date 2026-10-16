@@ -213,6 +213,7 @@ CREATE TABLE IF NOT EXISTS roster_status (
     status       TEXT,               -- ACT, RES (reserve lists), INA, DEV (practice squad) ...
     status_code  TEXT,               -- finer NFL code, e.g. R01
     years_exp    INTEGER,
+    espn_id      TEXT,               -- links the player to ESPN's injury list
     PRIMARY KEY (season, week, team, gsis_id)
 );
 
@@ -359,6 +360,75 @@ CREATE TABLE IF NOT EXISTS injury_status_log (
     tracking_start  INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (season, team, gsis_id)
 );
+
+-- ---------------------------------------------------------------------------
+-- espn_injuries: ESPN's league-wide injury list as of the last refresh
+-- (sources/espn_injuries.py). One row per listed player, the whole table
+-- replaced on each successful pull; a failed pull keeps the last good one.
+-- Only structured fields are stored. ESPN's written notes are loaded live in
+-- the viewer's browser and never saved or published.
+-- status 'Active' rows are mostly news items (signings, stat lines), kept so
+-- the board can say "ESPN: Active" for a player the official report still lists.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS espn_injuries (
+    espn_id       TEXT PRIMARY KEY,
+    team          TEXT NOT NULL,      -- nflverse abbreviation (LA, WAS)
+    gsis_id       TEXT,               -- NULL when the player couldn't be matched
+    player_name   TEXT,
+    position      TEXT,
+    status        TEXT NOT NULL,      -- Questionable, Doubtful, Out, Injured Reserve, Suspension, Active ...
+    injury        TEXT,               -- e.g. 'Foot (surgery, right)'
+    return_date   TEXT,               -- ESPN's estimated return, YYYY-MM-DD
+    updated_at    TEXT,               -- UTC ISO: when ESPN last posted an update on the player
+    fetched_at    TEXT NOT NULL       -- UTC ISO: when this board pulled the list
+);
+
+-- ---------------------------------------------------------------------------
+-- player_game_stats: nflverse weekly player stats, one row per player-game
+-- (sources/player_stats.py), for the props history. Counts only. A player
+-- who played but recorded no stat has NO row here -- queries.player_game_logs
+-- fills those games in as zeros from snap_counts.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS player_game_stats (
+    season            INTEGER NOT NULL,
+    week              INTEGER NOT NULL,
+    season_type       TEXT,
+    gsis_id           TEXT NOT NULL,
+    player_name       TEXT,
+    position          TEXT,
+    team              TEXT NOT NULL,
+    opponent          TEXT,
+    completions       INTEGER, attempts INTEGER, passing_yards INTEGER,
+    passing_tds       INTEGER, passing_interceptions INTEGER,
+    carries           INTEGER, rushing_yards INTEGER, rushing_tds INTEGER,
+    receptions        INTEGER, targets INTEGER, receiving_yards INTEGER, receiving_tds INTEGER,
+    special_teams_tds INTEGER,
+    PRIMARY KEY (season, week, gsis_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- prop_lines: the latest player prop line per game, player and market, from
+-- PropLine through the odds Worker (sources/props.py). The Worker already
+-- picked one line each: DraftKings' main line, else the line most books
+-- deal. Replaced per game on each successful pull; a failed pull keeps the
+-- last good lines. No prices history -- just the current board.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS prop_lines (
+    game_id       TEXT NOT NULL,      -- nflverse game id
+    event_id      TEXT,               -- PropLine event id
+    market        TEXT NOT NULL,      -- PropLine market key, e.g. player_reception_yds
+    player_name   TEXT NOT NULL,      -- PropLine's spelling
+    player_id     TEXT,               -- PropLine id, e.g. espn:4430878
+    gsis_id       TEXT,               -- matched nflverse player, NULL if unmatched
+    team          TEXT,               -- nflverse team of the matched player
+    line          REAL NOT NULL,
+    over_price    INTEGER,
+    under_price   INTEGER,            -- NULL for anytime TD (Yes only)
+    book          TEXT,               -- 'DraftKings' or 'most books'
+    n_books       INTEGER,
+    fetched_at    TEXT NOT NULL,
+    PRIMARY KEY (game_id, market, player_name)
+);
 """
 
 # ---------------------------------------------------------------------------
@@ -470,6 +540,9 @@ MIGRATIONS = {
     ],
     "game_injury_events": [
         ("qtr", "INTEGER"), ("game_clock", "TEXT"), ("notes", "TEXT"),
+    ],
+    "roster_status": [
+        ("espn_id", "TEXT"),
     ],
 }
 

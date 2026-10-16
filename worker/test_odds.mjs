@@ -35,3 +35,9 @@ const c = JSON.parse(kv.get("latest")); c.remaining = 10; c.fetched_at = new Dat
 const before = apiCalls; b = await (await worker.fetch(req(), env)).json();
 ok("below the 40-credit reserve it stops pulling for the month", apiCalls === before && /nearly used up/.test(b.note));
 ok("unknown paths 404", (await worker.fetch(req(undefined, "/"), env)).status === 404);
+const calls = apiCalls; r = await worker.fetch(req(undefined, "/status"), env); b = await r.json();
+ok("/status reports the last pull's balance without calling the API", r.status === 200 && apiCalls === calls
+  && b.remaining === 10 && b.at === JSON.parse(kv.get("latest")).fetched_at, JSON.stringify(b));
+ok("/status allows the board's origin", r.headers.get("Access-Control-Allow-Origin") === "https://marcuspeters310-sketch.github.io");
+kv.clear(); b = await (await worker.fetch(req(undefined, "/status"), env)).json();
+ok("/status before any pull ever: no balance, still no API call", b.remaining === null && apiCalls === calls);

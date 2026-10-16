@@ -13,13 +13,18 @@
  *   - At most MAX_PULLS_PER_DAY pulls per Chicago day.
  *   - Below RESERVE remaining credits, no more pulls this month.
  * When a limit hits, the last good pull is served with a note saying why.
+ * GET /status returns just the credit balance from the last pull (free: it
+ * reads storage and never calls The Odds API).
+ * GET /props/... relays PropLine player props -- see props.js.
  * The free plan can't run up charges either way -- it just stops answering
  * once the month's credits are gone.
  *
  * Bindings (see wrangler.toml): KV namespace ODDS, secret ODDS_API_KEY.
  */
 
-const ODDS_URL = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds";
+import { handleProps } from "./props.js";
+
+const ODDS_URL ="https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds";
 const MIN_AGE_MIN = 10;
 const MAX_PULLS_PER_DAY = 12;
 const RESERVE = 40;
@@ -72,12 +77,22 @@ export default {
       return new Response(null, { status: 204, headers: { ...cors(origin), "Access-Control-Allow-Methods": "GET", "Access-Control-Max-Age": "86400" } });
     }
     const url = new URL(request.url);
-    if (request.method !== "GET" || url.pathname !== "/odds") return json({ error: "not found" }, 404, origin);
+    if (request.method === "GET" && url.pathname.startsWith("/props/")) {
+      const [body, status] = await handleProps(url.pathname, env);
+      return json(body, status, origin);
+    }
+    if (request.method !== "GET" || !["/odds", "/status"].includes(url.pathname)) return json({ error: "not found" }, 404, origin);
 
     const now = new Date();
     const cached = await env.ODDS.get("latest", "json");
     const budget = (await env.ODDS.get("budget", "json")) || { day: "", pulls: 0 };
     if (budget.day !== chicagoDay(now)) Object.assign(budget, { day: chicagoDay(now), pulls: 0 });
+
+    // /status: the credit balance from the last pull, read from storage only.
+    // It never calls The Odds API, so the page can ask on every open for free.
+    if (url.pathname === "/status") {
+      return json({ remaining: cached?.remaining ?? null, at: cached?.fetched_at ?? null, pulls_today: budget.pulls }, 200, origin);
+    }
 
     const serveCached = note => cached
       ? json({ ...cached, cached: true, note }, 200, origin)

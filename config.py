@@ -41,10 +41,23 @@ SNAP_COUNTS_URL = NFLVERSE_RELEASE + "/snap_counts/snap_counts_{season}.csv.gz"
 # Weather: Open-Meteo forecast API (free, no key). Forecasts reach 16 days out.
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 
+# ESPN's league-wide NFL injury list (free, no key). The scheduled refresh
+# stores its structured fields; the board's injury refresh icon pulls the same
+# URL straight from the viewer's browser for the latest status and ESPN's notes.
+ESPN_INJURIES_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries"
+
+# Player props. Lines come from PropLine through the odds Worker
+# (worker/props.js holds the PropLine key; this repo never sees it). Player
+# history comes from nflverse's weekly player stats, joined to snap counts so
+# a game a player played without recording a stat counts as a zero.
+PLAYER_STATS_URL = NFLVERSE_RELEASE + "/stats_player/stats_player_week_{season}.csv.gz"
+PROP_HISTORY_SEASONS = 2            # this season and last (the seasons snap counts are loaded for)
+
 # The Cloudflare Worker in worker/ that relays The Odds API to the board's
 # refresh button (it holds the API key; this page never sees it). Empty =
 # no refresh button.
 ODDS_RELAY_URL = os.environ.get("ODDS_RELAY_URL", "https://nfl-board-odds.marcuspeters310.workers.dev")
+PROPS_RELAY_URL = os.environ.get("PROPS_RELAY_URL", ODDS_RELAY_URL)   # same Worker, /props routes
 # Whose line the refresh shows (the Odds API book title). A game that book
 # hasn't posted falls back to the line most books are dealing.
 ODDS_BOOK = "DraftKings"

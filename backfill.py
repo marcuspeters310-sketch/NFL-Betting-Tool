@@ -17,6 +17,9 @@ from sources.nflverse import load_games
 from sources.pbp import load_pbp
 from sources.rosters import load_availability
 from sources.weather import load_weather
+from sources.espn_injuries import load_espn_injuries
+from sources.player_stats import load_player_stats
+from sources.props import load_props
 from config import DB_PATH
 
 
@@ -59,6 +62,23 @@ def main() -> None:
     print("\nLoading depth charts, injury reports, roster status, snap counts...")
     for name, msg in load_availability(conn).items():
         print(f"  {name}: {msg}")
+
+    # After rosters: ESPN's list is matched to players through roster_status.
+    print("\nLoading ESPN's injury list...")
+    try:
+        print(f"  {load_espn_injuries(conn)}")
+    except Exception as exc:   # a nice-to-have like weather; keeps the last good list
+        print(f"  FAILED ({exc.__class__.__name__}: {str(exc)[:80]})")
+
+    print("\nLoading player game stats (props history)...")
+    for season, n in load_player_stats(conn, force="--full" in sys.argv).items():
+        print(f"  {season}: {'already loaded' if n == 'cached' else (f'{n:,} player-games' if isinstance(n, int) else n)}")
+
+    print("\nLoading player prop lines (PropLine, through the odds Worker)...")
+    try:
+        print(f"  {load_props(conn)}")
+    except Exception as exc:   # props are a nice-to-have; keeps the last good lines
+        print(f"  FAILED ({exc.__class__.__name__}: {str(exc)[:80]})")
 
     print("\nLoading kickoff weather forecasts (Open-Meteo)...")
     try:

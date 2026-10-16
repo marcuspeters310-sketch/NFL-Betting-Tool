@@ -176,6 +176,7 @@ def load_roster_status(conn, season: int) -> int:
         "position": df["position"], "jersey": df["jersey_number"].astype("Int64"),
         "status": df["status"], "status_code": df["status_description_abbr"],
         "years_exp": df["years_exp"].astype("Int64"),
+        "espn_id": pd.to_numeric(df["espn_id"], errors="coerce").astype("Int64").astype("string"),
     })
     return _replace(conn, "roster_status", list(out.columns), _clean(out),
                     "WHERE season = ?", (season,))
